@@ -3,18 +3,21 @@ import requests
 from datetime import datetime
 
 # ==========================================
-# 1. 設定區 (已帶入您的專屬 API Key)
+# 1. 設定區 (已綁定您的 API Key)
 # ==========================================
 RAPID_API_KEY = "5048786a54mshe1078420ed5662ap154c43jsndcfb158f929a" 
 API_HOST = "api-football-v1.p.rapidapi.com"
 
 # ==========================================
-# 2. 核心功能：連網抓取數據 (加入錯誤偵測機制)
+# 2. 核心功能：連網抓取數據
 # ==========================================
 @st.cache_data(ttl=60)
-def fetch_live_scores():
+def fetch_scores(season, date_str=None):
     url = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
-    querystring = {"league": "1", "season": "2022", "date": "2022-12-18"}
+    # 若提供日期則抓取該日賽事，若無則抓取該賽季即時比賽
+    querystring = {"league": "1", "season": season}
+    if date_str:
+        querystring["date"] = date_str
     
     headers = {
         "X-RapidAPI-Key": RAPID_API_KEY,
@@ -23,71 +26,59 @@ def fetch_live_scores():
 
     try:
         response = requests.get(url, headers=headers, params=querystring, timeout=10)
-        
         if response.status_code == 200:
             data = response.json()
-            
-            # 【關鍵修正】：攔截 API 平台隱藏的權限錯誤
             if data.get("errors"):
-                return {"error_msg": data["errors"]}
-                
+                return {"error_msg": str(data["errors"])}
             return {"data": data.get("response", [])}
         else:
             return {"error_msg": f"連線失敗，狀態碼：{response.status_code}"}
-            
-    except requests.exceptions.RequestException as e:
-        return {"error_msg": f"網路連線異常: {e}"}
+    except Exception as e:
+        return {"error_msg": str(e)}
 
 # ==========================================
-# 3. 網頁介面與資料解析
+# 3. 網頁介面
 # ==========================================
-st.set_page_config(page_title="測試中: 世足比分排版", page_icon="📡", layout="centered")
+st.set_page_config(page_title="2026世足自動比分", page_icon="🏆", layout="centered")
 
-st.title("📡 API 連線測試：2022 世足決賽")
-st.markdown("此為測試版，用來確認您的 API 金鑰權限是否已正式開通。")
+st.title("🏆 2026 世足賽自動比分看板")
+st.markdown("系統自動同步國際比賽數據，無需手動更新。")
 
-current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.caption(f"🔄 最後更新時間：{current_time}")
+# 模式切換：測試(2022歷史) vs 正式(2026)
+mode = st.radio("模式選擇：", ["測試模式 (2022決賽)", "正式模式 (2026賽季)"], horizontal=True)
 
-with st.spinner("正在與國際伺服器抓取歷史數據..."):
-    result = fetch_live_scores()
-
-# 根據 API 回傳的真實狀態顯示對應畫面
-if "error_msg" in result:
-    st.error("❌ API 伺服器拒絕存取，原廠錯誤訊息如下：")
-    st.write(result["error_msg"])
-    st.info("💡 提示：如果您看到『You are not subscribed』，請先至 RapidAPI 的 Pricing 頁籤點選 Basic 方案 Subscribe。")
-
-elif not result.get("data"):
-    st.warning("⚽ 伺服器權限正常，但找不到指定日期的賽事資料。")
-
+if mode == "測試模式 (2022決賽)":
+    result = fetch_scores(season="2022", date_str="2022-12-18")
 else:
-    matches_data = result["data"]
-    st.success(f"✅ API 串接成功！獲取到 {len(matches_data)} 場賽事。")
+    result = fetch_scores(season="2026")
+
+# 錯誤處理與顯示邏輯
+if "error_msg" in result:
+    st.error("❌ 連線錯誤，請檢查您的 API 權限：")
+    st.write(result["error_msg"])
+elif not result.get("data"):
+    st.warning("⚽ 目前無賽事數據，請稍後再試。")
+else:
+    matches = result["data"]
+    st.success(f"✅ 成功獲取 {len(matches)} 場賽事資訊！")
     
-    for match in matches_data:
-        home_team = match["teams"]["home"]["name"]
-        away_team = match["teams"]["away"]["name"]
-        home_score = match["goals"]["home"] or 0
-        away_score = match["goals"]["away"] or 0
-        status_short = match["fixture"]["status"]["short"]
+    for match in matches:
+        home = match["teams"]["home"]["name"]
+        away = match["teams"]["away"]["name"]
+        h_score = match["goals"]["home"] or 0
+        a_score = match["goals"]["away"] or 0
+        status = match["fixture"]["status"]["short"]
         
         st.markdown("---")
-        col1, col2, col3 = st.columns([3, 1, 3])
-        
-        with col1:
-            st.subheader(home_team)
-        
-        with col2:
-            st.markdown(f"<h2 style='text-align: center; color: red;'>{home_score} - {away_score}</h2>", unsafe_allow_html=True)
-            if status_short in ["FT", "AET", "PEN"]:
-                st.markdown("<p style='text-align: center;'>比賽結束</p>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<p style='text-align: center;'>{status_short}</p>", unsafe_allow_html=True)
-                
-        with col3:
-            st.markdown(f"<h3 style='text-align: right;'>{away_team}</h3>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns([3, 1, 3])
+        with c1:
+            st.subheader(home)
+        with c2:
+            st.markdown(f"<h2 style='text-align: center; color: red;'>{h_score} - {a_score}</h2>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align: center;'>{status}</p>", unsafe_allow_html=True)
+        with c3:
+            st.subheader(away)
 
-if st.button("🔄 手動強制刷新資料"):
+if st.button("🔄 強制刷新"):
     st.cache_data.clear()
     st.rerun()
