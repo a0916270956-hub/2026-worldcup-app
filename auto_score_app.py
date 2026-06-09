@@ -2,77 +2,76 @@ import streamlit as st
 import requests
 
 # ==========================================
-# 1. 設定區 
+# 1. API 參數設定區 (已更換為您的 API-Sports 原廠金鑰)
 # ==========================================
-RAPID_API_KEY = "5048786a54mshe1078420ed5662ap154c43jsndcfb158f929a" 
-API_HOST = "api-football-v1.p.rapidapi.com"
+API_KEY = "92d87d7767e403abc4ca3d8adbcca6fc"
 
 # ==========================================
-# 2. 核心功能
+# 2. 核心功能 (已修正為原廠專用網址與標頭)
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores(season, date_str=None):
-    url = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+    url = "https://v3.football.api-sports.io/fixtures"
     querystring = {"league": "1", "season": season}
     if date_str:
         querystring["date"] = date_str
     
+    # 這裡從 X-RapidAPI-Key 改成了原廠的 x-apisports-key
     headers = {
-        "X-RapidAPI-Key": RAPID_API_KEY,
-        "X-RapidAPI-Host": API_HOST
+        "x-apisports-key": API_KEY
     }
     try:
         response = requests.get(url, headers=headers, params=querystring, timeout=10)
         if response.status_code == 200:
-            return response.json().get("response", [])
-        return None
-    except:
-        return None
+            res_json = response.json()
+            if res_json.get("errors"):
+                return {"error": f"原廠回應錯誤：{res_json['errors']}"}
+            return {"data": res_json.get("response", [])}
+        elif response.status_code == 429:
+            return {"error": "API 每日免費額度已用盡，請明天再試！"}
+        else:
+            return {"error": f"伺服器錯誤代碼：{response.status_code}"}
+    except Exception as e:
+        return {"error": f"系統連線異常：{e}"}
 
 # ==========================================
-# 3. 網頁介面 (全面棄用 HTML 語法，確保 100% 顯示)
+# 3. 網頁介面
 # ==========================================
 st.set_page_config(page_title="世足賽即時比分", layout="centered")
 
-st.title("🏆 世足賽即時比分看板")
+st.title("🏆 世足賽即時比分看板 (單獨測試版)")
 
 mode = st.radio("模式切換：", ["測試 (2022決賽)", "正式 (2026賽季)"], horizontal=True)
 
 if mode == "測試 (2022決賽)":
-    data = fetch_scores("2022", "2022-12-18")
+    result = fetch_scores("2022", "2022-12-18")
 else:
-    data = fetch_scores("2026")
+    result = fetch_scores("2026")
 
-if data is None:
-    st.error("❌ 無法連線到 API")
-elif len(data) == 0:
-    st.warning("⚽ 目前無比賽資料")
+if "error" in result:
+    st.error(f"❌ {result['error']}")
+elif not result.get("data"):
+    st.info("⚽ 該日或賽季目前無比賽資料。")
 else:
-    st.success(f"✅ 成功抓取 {len(data)} 場資料！")
+    matches = result["data"]
+    st.success(f"✅ 成功抓取 {len(matches)} 場資料！")
     
-    # 【保險機制】直接把 API 傳回來的一手資料赤裸裸地印在畫面上，證明資料確實存在
-    st.write("---")
-    st.write("▼ 【系統底層資料驗證】如果您能看到下面這個框框，代表 API 已經成功把 3:3 的比分送進您的手機了：")
-    st.json(data)
-    
-    st.write("---")
-    st.write("▼ 【標準文字排版】(不使用任何可能被屏蔽的網頁色彩語法)")
-    
-    for match in data:
-        # 安全讀取資料
+    for match in matches:
         home = match.get("teams", {}).get("home", {}).get("name", "未知名稱")
         away = match.get("teams", {}).get("away", {}).get("name", "未知名稱")
-        
         h_score = match.get("goals", {}).get("home", 0)
         a_score = match.get("goals", {}).get("away", 0)
         status = match.get("fixture", {}).get("status", {}).get("short", "未知狀態")
         
-        # 100% 原生的顯示方式，絕對不會跑版或隱形
-        st.subheader(f"🏟️ 對戰組合：{home} vs {away}")
-        st.header(f"⚽ 當前比分： {h_score} - {a_score}")
-        st.write(f"⏱️ 賽事狀態： {status}")
-        st.write("---")
+        st.markdown("---")
+        st.markdown(f"### 🏟️ {home} 🆚 {away}")
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric(label=home, value=h_score)
+        col2.metric(label="賽事狀態", value=status)
+        col3.metric(label=away, value=a_score)
 
-if st.button("🔄 手動強制刷新"):
+st.markdown("<br>", unsafe_allow_html=True)
+if st.button("🔄 手動強制刷新", use_container_width=True):
     st.cache_data.clear()
     st.rerun()
