@@ -2,13 +2,13 @@ import streamlit as st
 import requests
 
 # ==========================================
-# 1. API 參數設定區 (已綁定您的金鑰)
+# 1. API 參數設定區
 # ==========================================
 RAPID_API_KEY = "5048786a54mshe1078420ed5662ap154c43jsndcfb158f929a" 
 API_HOST = "api-football-v1.p.rapidapi.com"
 
 # ==========================================
-# 2. 自動連網抓取函式
+# 2. 自動連網抓取函式 (升級版：精準捕捉錯誤)
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores(season, date_str=None):
@@ -24,10 +24,17 @@ def fetch_scores(season, date_str=None):
     try:
         response = requests.get(url, headers=headers, params=querystring, timeout=10)
         if response.status_code == 200:
-            return response.json().get("response", [])
-        return None
-    except:
-        return None
+            res_json = response.json()
+            # 攔截 API 內部的參數錯誤 (例如 2026 賽季不存在)
+            if res_json.get("errors"):
+                return {"error": f"API 官方回應：{res_json['errors']}"}
+            return {"data": res_json.get("response", [])}
+        elif response.status_code == 429:
+            return {"error": "API 每日 100 次免費額度已用盡，請明天再來！"}
+        else:
+            return {"error": f"伺服器錯誤代碼：{response.status_code}"}
+    except Exception as e:
+        return {"error": f"系統連線異常：{e}"}
 
 # ==========================================
 # 3. 2026 賽程靜態資料庫 (台北時間)
@@ -63,10 +70,8 @@ st.set_page_config(page_title="世足賽程與比分", page_icon="🏆", layout=
 st.title("🏆 2026 世足賽程與即時比分")
 st.markdown("美加墨聯合主辦｜賽程表與自動同步比分系統")
 
-# 建立三個分頁
 tab1, tab2, tab3 = st.tabs(["🏆 淘汰賽", "⚽ 分組賽", "📡 即時戰況(自動)"])
 
-# 【分頁1：淘汰賽】
 with tab1:
     st.subheader("世界盃淘汰賽段")
     for stage, matches in knockout_matches.items():
@@ -74,7 +79,6 @@ with tab1:
             for match in matches:
                 st.markdown(f"🕒 **{match}**")
 
-# 【分頁2：分組賽】
 with tab2:
     st.subheader("48強分組賽段")
     for group, matches in group_matches.items():
@@ -82,29 +86,29 @@ with tab2:
             for match in matches:
                 st.markdown(f"🕒 **{match}**")
 
-# 【分頁3：即時比分 (API 自動連線)】
 with tab3:
     st.subheader("國際伺服器自動同步")
     
-    # 保留測試切換鍵，讓您隨時可以確認系統運作正常
     mode = st.radio("賽季選擇：", ["測試模式 (2022決賽)", "正式模式 (2026賽季)"], horizontal=True)
     
     if st.button("🔄 立即同步最新比分", use_container_width=True):
         st.cache_data.clear()
         
     if mode == "測試模式 (2022決賽)":
-        data = fetch_scores("2022", "2022-12-18")
+        result = fetch_scores("2022", "2022-12-18")
     else:
-        data = fetch_scores("2026")
+        result = fetch_scores("2026")
 
-    if data is None:
-        st.error("❌ 無法連線到 API，請檢查網路。")
-    elif len(data) == 0:
+    # 新版精準錯誤處理邏輯
+    if "error" in result:
+        st.error(f"❌ {result['error']}")
+    elif not result.get("data"):
         st.info("⚽ 該日或賽季目前無比賽資料。")
     else:
-        st.success(f"✅ 成功同步 {len(data)} 場賽事！")
+        matches = result["data"]
+        st.success(f"✅ 成功同步 {len(matches)} 場賽事！")
         
-        for match in data:
+        for match in matches:
             home = match.get("teams", {}).get("home", {}).get("name", "未知名稱")
             away = match.get("teams", {}).get("away", {}).get("name", "未知名稱")
             h_score = match.get("goals", {}).get("home", 0)
@@ -112,10 +116,8 @@ with tab3:
             status = match.get("fixture", {}).get("status", {}).get("short", "未知狀態")
             
             st.markdown("---")
-            # 使用官方支援、絕對不會被阻擋的原生 Markdown 與 Metric 元件
             st.markdown(f"### 🏟️ {home} 🆚 {away}")
             
-            # 使用數據看板顯示，整齊又清晰
             col1, col2, col3 = st.columns(3)
             col1.metric(label=home, value=h_score)
             col2.metric(label="賽事狀態", value=status)
