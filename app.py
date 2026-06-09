@@ -1,17 +1,37 @@
 import streamlit as st
+import requests
 
-# 設定網頁標題與手機版面適應
-st.set_page_config(page_title="2026世足賽程與比分", page_icon="🏆", layout="centered")
+# ==========================================
+# 1. API 參數設定區 (已綁定您的金鑰)
+# ==========================================
+RAPID_API_KEY = "5048786a54mshe1078420ed5662ap154c43jsndcfb158f929a" 
+API_HOST = "api-football-v1.p.rapidapi.com"
 
-st.title("🏆 2026 世足賽程與即時比分")
-st.markdown("美加墨聯合主辦｜支援隨時更新賽事比分 (皆為台北時間)")
+# ==========================================
+# 2. 自動連網抓取函式
+# ==========================================
+@st.cache_data(ttl=60)
+def fetch_scores(season, date_str=None):
+    url = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+    querystring = {"league": "1", "season": season}
+    if date_str:
+        querystring["date"] = date_str
+    
+    headers = {
+        "X-RapidAPI-Key": RAPID_API_KEY,
+        "X-RapidAPI-Host": API_HOST
+    }
+    try:
+        response = requests.get(url, headers=headers, params=querystring, timeout=10)
+        if response.status_code == 200:
+            return response.json().get("response", [])
+        return None
+    except:
+        return None
 
-# --- 1. 建立儲存比分的記憶體 (Session State) ---
-if 'scores' not in st.session_state:
-    st.session_state.scores = {}
-
-# --- 2. 賽程資料庫 ---
-# 分組賽資料 (已載明台北時間)
+# ==========================================
+# 3. 2026 賽程靜態資料庫 (台北時間)
+# ==========================================
 group_matches = {
     "A組": ["6/12 03:00 墨西哥 VS 南非", "6/12 10:00 韓國 VS 捷克", "6/19 00:00 捷克 VS 南非", "6/19 09:00 墨西哥 VS 韓國", "6/25 09:00 南非 VS 韓國", "6/25 09:00 捷克 VS 墨西哥"],
     "B組": ["6/13 03:00 加拿大 VS 波赫", "6/14 03:00 卡達 VS 瑞士", "6/19 03:00 波赫 VS 瑞士", "6/19 06:00 加拿大 VS 卡達", "6/25 03:00 瑞士 VS 加拿大", "6/25 03:00 波赫 VS 卡達"],
@@ -27,54 +47,24 @@ group_matches = {
     "L組": ["6/18 04:00 英格蘭 VS 克羅埃西亞", "6/18 07:00 迦納 VS 巴拿馬", "6/24 04:00 英格蘭 VS 迦納", "6/24 07:00 巴拿馬 VS 克羅埃西亞", "6/28 05:00 巴拿馬 VS 英格蘭", "6/28 05:00 克羅埃西亞 VS 迦納"]
 }
 
-# 淘汰賽資料 (已替換為預定出賽隊伍晉級席位)
 knockout_matches = {
-    "🏆 冠軍戰 & 季軍戰": [
-        "7/20 03:00 [決賽] 4強勝方1 VS 4強勝方2",
-        "7/19 05:00 [季軍戰] 4強敗方1 VS 4強敗方2"
-    ],
-    "⭐ 4強賽 (共2場)": [
-        "7/15 06:00 [4強賽1] 8強勝方1 VS 8強勝方2", 
-        "7/16 06:00 [4強賽2] 8強勝方3 VS 8強勝方4"
-    ],
-    "⚔️ 8強賽 (共4場)": [
-        "7/10 06:00 [8強賽1] 16強勝方1 VS 16強勝方2", 
-        "7/11 01:00 [8強賽2] 16強勝方3 VS 16強勝方4",
-        "7/11 06:00 [8強賽3] 16強勝方5 VS 16強勝方6", 
-        "7/12 06:00 [8強賽4] 16強勝方7 VS 16強勝方8"
-    ],
-    "🎯 16強賽 (共8場)": [
-        "7/05 01:00 [16強賽1] 32強勝方1 VS 32強勝方2", 
-        "7/05 06:00 [16強賽2] 32強勝方3 VS 32強勝方4",
-        "7/06 01:00 [16強賽3] 32強勝方5 VS 32強勝方6", 
-        "7/06 06:00 [16強賽4] 32強勝方7 VS 32強勝方8",
-        "7/07 01:00 [16強賽5] 32強勝方9 VS 32強勝方10", 
-        "7/07 06:00 [16強賽6] 32強勝方11 VS 32強勝方12",
-        "7/08 01:00 [16強賽7] 32強勝方13 VS 32強勝方14", 
-        "7/08 06:00 [16強賽8] 32強勝方15 VS 32強勝方16"
-    ],
-    "🚀 32強賽 (共16場 - 晉級席位交叉對戰)": [
-        "6/29 01:00 [32強賽1] A組第1 VS 最佳第3名(1)", 
-        "6/29 06:00 [32強賽2] B組第2 VS C組第2", 
-        "6/30 01:00 [32強賽3] D組第1 VS 最佳第3名(2)", 
-        "6/30 06:00 [32強賽4] E組第1 VS 最佳第3名(3)", 
-        "6/30 10:00 [32強賽5] F組第1 VS 最佳第3名(4)",
-        "7/01 01:00 [32強賽6] G組第2 VS H組第2", 
-        "7/01 06:00 [32強賽7] I組第1 VS 最佳第3名(5)", 
-        "7/01 10:00 [32強賽8] J組第1 VS 最佳第3名(6)",
-        "7/02 01:00 [32強賽9] K組第1 VS 最佳第3名(7)", 
-        "7/02 06:00 [32強賽10] L組第1 VS 最佳第3名(8)", 
-        "7/02 10:00 [32強賽11] A組第2 VS B組第1",
-        "7/03 01:00 [32強賽12] C組第1 VS D組第2", 
-        "7/03 06:00 [32強賽13] E組第2 VS F組第2", 
-        "7/03 10:00 [32強賽14] G組第1 VS H組第1",
-        "7/04 01:00 [32強賽15] I組第2 VS J組第2", 
-        "7/04 06:00 [32強賽16] K組第2 VS L組第2"
-    ]
+    "🏆 冠軍戰 & 季軍戰": ["7/20 03:00 [決賽] 4強勝方1 VS 4強勝方2", "7/19 05:00 [季軍戰] 4強敗方1 VS 4強敗方2"],
+    "⭐ 4強賽 (共2場)": ["7/15 06:00 [4強賽1] 8強勝方1 VS 8強勝方2", "7/16 06:00 [4強賽2] 8強勝方3 VS 8強勝方4"],
+    "⚔️ 8強賽 (共4場)": ["7/10 06:00 [8強賽1] 16強勝方1 VS 16強勝方2", "7/11 01:00 [8強賽2] 16強勝方3 VS 16強勝方4", "7/11 06:00 [8強賽3] 16強勝方5 VS 16強勝方6", "7/12 06:00 [8強賽4] 16強勝方7 VS 16強勝方8"],
+    "🎯 16強賽 (共8場)": ["7/05 01:00 [16強賽1] 32強勝方1 VS 32強勝方2", "7/05 06:00 [16強賽2] 32強勝方3 VS 32強勝方4", "7/06 01:00 [16強賽3] 32強勝方5 VS 32強勝方6", "7/06 06:00 [16強賽4] 32強勝方7 VS 32強勝方8", "7/07 01:00 [16強賽5] 32強勝方9 VS 32強勝方10", "7/07 06:00 [16強賽6] 32強勝方11 VS 32強勝方12", "7/08 01:00 [16強賽7] 32強勝方13 VS 32強勝方14", "7/08 06:00 [16強賽8] 32強勝方15 VS 32強勝方16"],
+    "🚀 32強賽 (共16場)": ["6/29 01:00 [32強賽1] A組第1 VS 最佳第3名(1)", "6/29 06:00 [32強賽2] B組第2 VS C組第2", "6/30 01:00 [32強賽3] D組第1 VS 最佳第3名(2)", "6/30 06:00 [32強賽4] E組第1 VS 最佳第3名(3)", "6/30 10:00 [32強賽5] F組第1 VS 最佳第3名(4)", "7/01 01:00 [32強賽6] G組第2 VS H組第2", "7/01 06:00 [32強賽7] I組第1 VS 最佳第3名(5)", "7/01 10:00 [32強賽8] J組第1 VS 最佳第3名(6)", "7/02 01:00 [32強賽9] K組第1 VS 最佳第3名(7)", "7/02 06:00 [32強賽10] L組第1 VS 最佳第3名(8)", "7/02 10:00 [32強賽11] A組第2 VS B組第1", "7/03 01:00 [32強賽12] C組第1 VS D組第2", "7/03 06:00 [32強賽13] E組第2 VS F組第2", "7/03 10:00 [32強賽14] G組第1 VS H組第1", "7/04 01:00 [32強賽15] I組第2 VS J組第2", "7/04 06:00 [32強賽16] K組第2 VS L組第2"]
 }
 
-# --- 3. 建立手機版友善的三個分頁 ---
-tab1, tab2, tab3 = st.tabs(["🏆 淘汰賽", "⚽ 分組賽", "✏️ 登記比分"])
+# ==========================================
+# 4. 主程式介面與排版
+# ==========================================
+st.set_page_config(page_title="世足賽程與比分", page_icon="🏆", layout="centered")
+
+st.title("🏆 2026 世足賽程與即時比分")
+st.markdown("美加墨聯合主辦｜賽程表與自動同步比分系統")
+
+# 建立三個分頁
+tab1, tab2, tab3 = st.tabs(["🏆 淘汰賽", "⚽ 分組賽", "📡 即時戰況(自動)"])
 
 # 【分頁1：淘汰賽】
 with tab1:
@@ -82,10 +72,7 @@ with tab1:
     for stage, matches in knockout_matches.items():
         with st.expander(stage):
             for match in matches:
-                score = st.session_state.scores.get(match, "尚未開賽")
                 st.markdown(f"🕒 **{match}**")
-                st.markdown(f"👉 目前比分： `{score}`")
-                st.divider()
 
 # 【分頁2：分組賽】
 with tab2:
@@ -93,31 +80,43 @@ with tab2:
     for group, matches in group_matches.items():
         with st.expander(f"📍 {group}"):
             for match in matches:
-                score = st.session_state.scores.get(match, "尚未開賽")
                 st.markdown(f"🕒 **{match}**")
-                st.markdown(f"👉 目前比分： `{score}`")
-                st.divider()
 
-# 【分頁3：登記比分 (管理員模式)】
+# 【分頁3：即時比分 (API 自動連線)】
 with tab3:
-    st.subheader("更新賽事結果")
-    st.info("在此輸入的比分，將會即時同步到賽程表中！")
+    st.subheader("國際伺服器自動同步")
     
-    stage_choice = st.radio("請選擇賽事階段：", ["淘汰賽", "分組賽"], horizontal=True)
+    # 保留測試切換鍵，讓您隨時可以確認系統運作正常
+    mode = st.radio("賽季選擇：", ["測試模式 (2022決賽)", "正式模式 (2026賽季)"], horizontal=True)
     
-    if stage_choice == "分組賽":
-        group_sel = st.selectbox("1. 選擇組別", list(group_matches.keys()))
-        match_sel = st.selectbox("2. 選擇賽事", group_matches[group_sel])
+    if st.button("🔄 立即同步最新比分", use_container_width=True):
+        st.cache_data.clear()
+        
+    if mode == "測試模式 (2022決賽)":
+        data = fetch_scores("2022", "2022-12-18")
     else:
-        k_stage_sel = st.selectbox("1. 選擇賽段", list(knockout_matches.keys()))
-        match_sel = st.selectbox("2. 選擇賽事", knockout_matches[k_stage_sel])
-    
-    current_score = st.session_state.scores.get(match_sel, "")
-    new_score = st.text_input("3. 輸入比分 (例如： 2 - 1 或 PK 4-3)", value=current_score)
-    
-    if st.button("💾 儲存更新", use_container_width=True):
-        if new_score:
-            st.session_state.scores[match_sel] = new_score
-            st.success("✅ 比分已更新！請切換到「淘汰賽」或「分組賽」分頁查看最新結果。")
-        else:
-            st.warning("請先輸入比分。")
+        data = fetch_scores("2026")
+
+    if data is None:
+        st.error("❌ 無法連線到 API，請檢查網路。")
+    elif len(data) == 0:
+        st.info("⚽ 該日或賽季目前無比賽資料。")
+    else:
+        st.success(f"✅ 成功同步 {len(data)} 場賽事！")
+        
+        for match in data:
+            home = match.get("teams", {}).get("home", {}).get("name", "未知名稱")
+            away = match.get("teams", {}).get("away", {}).get("name", "未知名稱")
+            h_score = match.get("goals", {}).get("home", 0)
+            a_score = match.get("goals", {}).get("away", 0)
+            status = match.get("fixture", {}).get("status", {}).get("short", "未知狀態")
+            
+            st.markdown("---")
+            # 使用官方支援、絕對不會被阻擋的原生 Markdown 與 Metric 元件
+            st.markdown(f"### 🏟️ {home} 🆚 {away}")
+            
+            # 使用數據看板顯示，整齊又清晰
+            col1, col2, col3 = st.columns(3)
+            col1.metric(label=home, value=h_score)
+            col2.metric(label="賽事狀態", value=status)
+            col3.metric(label=away, value=a_score)
