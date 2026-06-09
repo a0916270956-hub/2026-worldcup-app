@@ -2,41 +2,36 @@ import streamlit as st
 import requests
 
 # ==========================================
-# 1. API 參數設定區
+# 1. API 參數設定區 (已更換為您的 API-Sports 原廠金鑰)
 # ==========================================
-RAPID_API_KEY = "5048786a54mshe1078420ed5662ap154c43jsndcfb158f929a" 
-API_HOST = "api-football-v1.p.rapidapi.com"
+API_KEY = "92d87d7767e403abc4ca3d8adbcca6fc"
 
 # ==========================================
-# 2. 自動連網抓取函式 (升級：捕捉 403 真實原因)
+# 2. 自動連網抓取函式 (已修正為 API-Sports 原廠規格)
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores(season, date_str=None):
-    url = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+    # 網址已修正為原廠專用網址
+    url = "https://v3.football.api-sports.io/fixtures"
     querystring = {"league": "1", "season": season}
     if date_str:
         querystring["date"] = date_str
     
+    # 標頭已修正為原廠驗證格式 x-apisports-key
     headers = {
-        "X-RapidAPI-Key": RAPID_API_KEY,
-        "X-RapidAPI-Host": API_HOST
+        "x-apisports-key": API_KEY
     }
     try:
         response = requests.get(url, headers=headers, params=querystring, timeout=10)
         if response.status_code == 200:
             res_json = response.json()
             if res_json.get("errors"):
-                return {"error": f"API 官方回應：{res_json['errors']}"}
+                return {"error": f"原廠回應錯誤：{res_json['errors']}"}
             return {"data": res_json.get("response", [])}
         elif response.status_code == 429:
-            return {"error": "API 每日 100 次免費額度已用盡，請明天再來！"}
+            return {"error": "API 每日免費額度已用盡，請明天再試！"}
         else:
-            # 【關鍵修改】把 403 等錯誤的原廠真實訊息抓出來
-            try:
-                err_detail = response.json().get("message", response.text)
-            except:
-                err_detail = response.text
-            return {"error": f"伺服器拒絕連線 (代碼 {response.status_code})。原廠說明：{err_detail}"}
+            return {"error": f"伺服器錯誤代碼：{response.status_code}"}
     except Exception as e:
         return {"error": f"系統連線異常：{e}"}
 
@@ -103,7 +98,7 @@ with tab3:
     else:
         result = fetch_scores("2026")
 
-    # 顯示錯誤與抓取結果
+    # 顯示結果與排版
     if "error" in result:
         st.error(f"❌ {result['error']}")
     elif not result.get("data"):
