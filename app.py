@@ -8,7 +8,7 @@ RAPID_API_KEY = "5048786a54mshe1078420ed5662ap154c43jsndcfb158f929a"
 API_HOST = "api-football-v1.p.rapidapi.com"
 
 # ==========================================
-# 2. 自動連網抓取函式 (升級版：精準捕捉錯誤)
+# 2. 自動連網抓取函式 (升級：捕捉 403 真實原因)
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores(season, date_str=None):
@@ -25,14 +25,18 @@ def fetch_scores(season, date_str=None):
         response = requests.get(url, headers=headers, params=querystring, timeout=10)
         if response.status_code == 200:
             res_json = response.json()
-            # 攔截 API 內部的參數錯誤 (例如 2026 賽季不存在)
             if res_json.get("errors"):
                 return {"error": f"API 官方回應：{res_json['errors']}"}
             return {"data": res_json.get("response", [])}
         elif response.status_code == 429:
             return {"error": "API 每日 100 次免費額度已用盡，請明天再來！"}
         else:
-            return {"error": f"伺服器錯誤代碼：{response.status_code}"}
+            # 【關鍵修改】把 403 等錯誤的原廠真實訊息抓出來
+            try:
+                err_detail = response.json().get("message", response.text)
+            except:
+                err_detail = response.text
+            return {"error": f"伺服器拒絕連線 (代碼 {response.status_code})。原廠說明：{err_detail}"}
     except Exception as e:
         return {"error": f"系統連線異常：{e}"}
 
@@ -99,7 +103,7 @@ with tab3:
     else:
         result = fetch_scores("2026")
 
-    # 新版精準錯誤處理邏輯
+    # 顯示錯誤與抓取結果
     if "error" in result:
         st.error(f"❌ {result['error']}")
     elif not result.get("data"):
