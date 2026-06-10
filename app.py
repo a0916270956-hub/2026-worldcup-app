@@ -3,51 +3,28 @@ import requests
 from datetime import datetime
 
 # ==========================================
-# 1. API 參數設定區 (原廠金鑰)
+# 1. API 設定區 (已綁定您超穩定的 Football-Data.org 金鑰)
 # ==========================================
-API_KEY = "92d87d7767e403abc4ca3d8adbcca6fc"
+API_TOKEN = "d5921a999fd5418aa3c5026db3889cf2"
 
 # ==========================================
-# 2. 自動連網抓取函式 (破解免費版限制邏輯)
+# 2. 自動連網抓取函式 (Football-Data.org 專用)
 # ==========================================
 @st.cache_data(ttl=60)
-def fetch_scores(is_test_mode=False):
-    url = "https://v3.football.api-sports.io/fixtures"
-    headers = {"x-apisports-key": API_KEY}
-    
-    if is_test_mode:
-        # 【破解限制 1】測試模式：不給日期，直接要 2022 全年資料
-        querystring = {"league": "1", "season": "2022"}
-    else:
-        # 【破解限制 2】正式模式：不要整個 2026 賽季，改要「當天」的即時資料
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        querystring = {"league": "1", "date": today_str}
+def fetch_scores(season="2026"):
+    # 使用 Football-Data.org 官方世界盃 (WC) 賽事路徑
+    url = "https://api.football-data.org/v4/competitions/WC/matches"
+    headers = {"X-Auth-Token": API_TOKEN}
+    params = {"season": season}
     
     try:
-        response = requests.get(url, headers=headers, params=querystring, timeout=10)
+        response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
-            res_json = response.json()
-            
-            # 攔截並顯示原廠的字典格式錯誤
-            if res_json.get("errors"):
-                err_msg = res_json['errors']
-                # 如果錯誤是字典格式，轉成文字顯示
-                if isinstance(err_msg, dict):
-                    err_msg = " | ".join([f"{k}: {v}" for k, v in err_msg.items()])
-                return {"error": f"原廠限制：{err_msg}"}
-            
-            data = res_json.get("response", [])
-            
-            # 如果是測試模式，拿到 64 場比賽後，只截取最後一場 (阿根廷 vs 法國決賽)
-            if is_test_mode and len(data) > 0:
-                data = [data[-1]]
-                
-            return {"data": data}
-            
+            return {"data": response.json().get("matches", [])}
         elif response.status_code == 429:
-            return {"error": "API 每日免費額度已用盡，請明天再試！"}
+            return {"error": "已達到每分鐘請求次數限制，請等候一分鐘後再刷新。"}
         else:
-            return {"error": f"伺服器錯誤代碼：{response.status_code}"}
+            return {"error": f"國際伺服器回應錯誤 (代碼 {response.status_code})"}
     except Exception as e:
         return {"error": f"系統連線異常：{e}"}
 
@@ -74,16 +51,16 @@ knockout_matches = {
     "⭐ 4強賽 (共2場)": ["7/15 06:00 [4強賽1] 8強勝方1 VS 8強勝方2", "7/16 06:00 [4強賽2] 8強勝方3 VS 8強勝方4"],
     "⚔️ 8強賽 (共4場)": ["7/10 06:00 [8強賽1] 16強勝方1 VS 16強勝方2", "7/11 01:00 [8強賽2] 16強勝方3 VS 16強勝方4", "7/11 06:00 [8強賽3] 16強勝方5 VS 16強勝方6", "7/12 06:00 [8強賽4] 16強勝方7 VS 16強勝方8"],
     "🎯 16強賽 (共8場)": ["7/05 01:00 [16強賽1] 32強勝方1 VS 32強勝方2", "7/05 06:00 [16強賽2] 32強勝方3 VS 32強勝方4", "7/06 01:00 [16強賽3] 32強勝方5 VS 32強勝方6", "7/06 06:00 [16強賽4] 32強勝方7 VS 32強勝方8", "7/07 01:00 [16強賽5] 32強勝方9 VS 32強勝方10", "7/07 06:00 [16強賽6] 32強勝方11 VS 32強勝方12", "7/08 01:00 [16強賽7] 32強勝方13 VS 32強勝方14", "7/08 06:00 [16強賽8] 32強勝方15 VS 32強勝方16"],
-    "🚀 32強賽 (共16場)": ["6/29 01:00 [32強賽1] A組第1 VS 最佳第3名(1)", "6/29 06:00 [32強賽2] B組第2 VS C組第2", "6/30 01:00 [32強賽3] D組第1 VS 最佳第3名(2)", "6/30 06:00 [32強賽4] E組第1 VS 最佳第3名(3)", "6/30 10:00 [32強賽5] F組第1 VS 最佳第3名(4)", "7/01 01:00 [32強賽6] G組第2 VS H組第2", "7/01 06:00 [32強賽7] I組第1 VS 最佳第3名(5)", "7/01 10:00 [32強賽8] J組第1 VS 最佳第3名(6)", "7/02 01:00 [32強賽9] K組第1 VS 最佳第3名(7)", "7/02 06:00 [32強賽10] L組第1 VS 最佳第3名(8)", "7/02 10:00 [32強賽11] A組第2 VS B組第1", "7/03 01:00 [32強賽12] C組第1 VS D組第2", "7/03 06:00 [32強賽13] E組第2 VS F組第2", "7/03 10:00 [32強賽14] G組第1 VS H組第1", "7/04 01:00 [32強賽15] I組第2 VS J組第2", "7/04 06:00 [32強賽16] K組第2 VS L組第2"]
+    "🚀 32強賽 (共16場)": ["6/29 01:00 [32強賽1] A組第1 VS 最佳第3名(1)", "6/29 06:00 [32強賽2] B組第2 VS C組第2", "6/30 01:00 [32強賽3] D 單組第1 VS 最佳第3名(2)", "6/30 06:00 [32強賽4] E組第1 VS 最佳第3名(3)", "6/30 10:00 [32強賽5] F組第1 VS 最佳第3名(4)", "7/01 01:00 [32強賽6] G組第2 VS H組第2", "7/01 06:00 [32強賽7] I組第1 VS 最佳第3名(5)", "7/01 10:00 [32強賽8] J組第1 VS 最佳第3名(6)", "7/02 01:00 [32強賽9] K組第1 VS 最佳第3名(7)", "7/02 06:00 [32強賽10] L組第1 VS 最佳第3名(8)", "7/02 10:00 [32強賽11] A組第2 VS B組第1", "7/03 01:00 [32強賽12] C組第1 VS D組第2", "7/03 06:00 [32強賽13] E組第2 VS F組第2", "7/03 10:00 [32強賽14] G組第1 VS H組第1", "7/04 01:00 [32強賽15] I組第2 VS J組第2", "7/04 06:00 [32強賽16] K組第2 VS L組第2"]
 }
 
 # ==========================================
 # 4. 主程式介面與排版
 # ==========================================
-st.set_page_config(page_title="世足賽程與比分", page_icon="🏆", layout="centered")
+st.set_page_config(page_title="2026世足賽程與比分", page_icon="🏆", layout="centered")
 
 st.title("🏆 2026 世足賽程與即時比分")
-st.markdown("美加墨聯合主辦｜賽程表與自動同步比分系統")
+st.markdown("美加墨聯合主辦｜賽程表與開源自動同步比分系統")
 
 tab1, tab2, tab3 = st.tabs(["🏆 淘汰賽", "⚽ 分組賽", "📡 即時戰況(自動)"])
 
@@ -102,38 +79,68 @@ with tab2:
                 st.markdown(f"🕒 **{match}**")
 
 with tab3:
-    st.subheader("國際伺服器自動同步")
+    st.subheader("開源伺服器自動同步")
     
-    mode = st.radio("賽季選擇：", ["測試模式 (2022決賽)", "正式模式 (今日賽況)"], horizontal=True)
+    mode = st.radio("賽季選擇：", ["測試模式 (2022決賽)", "正式模式 (今日即時)"], horizontal=True)
     
     if st.button("🔄 立即同步最新比分", use_container_width=True):
         st.cache_data.clear()
         
     if mode == "測試模式 (2022決賽)":
-        result = fetch_scores(is_test_mode=True)
+        result = fetch_scores(season="2022")
     else:
-        result = fetch_scores(is_test_mode=False)
+        result = fetch_scores(season="2026")
 
     # 顯示結果與排版
     if "error" in result:
         st.error(f"❌ {result['error']}")
-    elif not result.get("data"):
-        st.info("⚽ 該日或賽季目前無比賽資料。 (提示：2026正式賽事尚未開打)")
     else:
-        matches = result["data"]
-        st.success(f"✅ 成功同步 {len(matches)} 場賽事！")
+        all_matches = result.get("data", [])
+        display_matches = []
         
-        for match in matches:
-            home = match.get("teams", {}).get("home", {}).get("name", "未知名稱")
-            away = match.get("teams", {}).get("away", {}).get("name", "未知名稱")
-            h_score = match.get("goals", {}).get("home", 0)
-            a_score = match.get("goals", {}).get("away", 0)
-            status = match.get("fixture", {}).get("status", {}).get("short", "未知狀態")
+        if mode == "測試模式 (2022決賽)":
+            # 尋找 2022 年決賽 (Argentina vs France)
+            finals = [m for m in all_matches if m.get("stage") == "FINAL"]
+            if finals:
+                display_matches = [finals[0]]
+            elif len(all_matches) > 0:
+                display_matches = [all_matches[-1]]
+        else:
+            # 正式模式：過濾出今天日期的賽事
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            display_matches = [m for m in all_matches if m.get("utcDate", "").startswith(today_str)]
+
+        if not display_matches:
+            if mode == "正式模式 (今日即時)":
+                st.info(f"⚽ 今日 ({datetime.now().strftime('%Y-%m-%d')}) 暫無進行中的世界盃賽事。\n(提示：2026世界盃首場分組賽將於台北時間 6/12 03:00 正式開踢！)")
+            else:
+                st.warning("⚽ 找不到對應的賽事數據。")
+        else:
+            st.success(f"✅ 成功獲取 {len(display_matches)} 場賽事資訊！")
             
-            st.markdown("---")
-            st.markdown(f"### 🏟️ {home} 🆚 {away}")
+            # 狀態轉換字典
+            status_map = {
+                "FINISHED": "比賽結束", "IN_PLAY": "進行中", "PAUSED": "中場休息",
+                "TIMED": "未開始", "SCHEDULED": "已排程", "POSTPONED": "延期"
+            }
             
-            col1, col2, col3 = st.columns(3)
-            col1.metric(label=home, value=h_score)
-            col2.metric(label="賽事狀態", value=status)
-            col3.metric(label=away, value=a_score)
+            for match in display_matches:
+                home = match.get("homeTeam", {}).get("name", "未知名稱")
+                away = match.get("awayTeam", {}).get("name", "未知名稱")
+                
+                score_data = match.get("score", {}).get("fullTime", {})
+                h_score = score_data.get("home")
+                a_score = score_data.get("away")
+                h_score = 0 if h_score is None else h_score
+                a_score = 0 if a_score is None else a_score
+                
+                status_raw = match.get("status", "UNKNOWN")
+                status_text = status_map.get(status_raw, status_raw)
+                
+                st.markdown("---")
+                st.markdown(f"### 🏟️ {home} 🆚 {away}")
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric(label=home, value=h_score)
+                col2.metric(label="賽事狀態", value=status_text)
+                col3.metric(label=away, value=a_score)
