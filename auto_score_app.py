@@ -7,24 +7,24 @@ from datetime import datetime
 # ==========================================
 API_TOKEN = "d5921a999fd5418aa3c5026db3889cf2"
 
+TEAM_TRANSLATION = {
+    "Argentina": "阿根廷", "France": "法國"
+}
+
 # ==========================================
-# 2. 核心功能 (Football-Data.org 專用)
+# 2. 核心功能
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores(season="2026"):
     url = "https://api.football-data.org/v4/competitions/WC/matches"
     headers = {"X-Auth-Token": API_TOKEN}
     params = {"season": season}
-    
     try:
         response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
             return {"data": response.json().get("matches", [])}
         elif response.status_code == 429:
             return {"error": "已達到每分鐘請求次數限制，請稍候再刷新。"}
-        elif response.status_code == 403:
-            msg = response.json().get("message", "權限不足，可能無法存取歷史賽事。")
-            return {"error": f"原廠權限限制 (403)：{msg}"}
         else:
             return {"error": f"國際伺服器回應錯誤 (代碼 {response.status_code})"}
     except Exception as e:
@@ -45,7 +45,6 @@ if st.button("🔄 手動強制刷新", use_container_width=True):
 display_matches = []
 is_error = False
 
-# 邏輯區分：測試模式完全離線不連網
 if mode == "測試 (2022決賽)":
     st.success("✅ 成功載入歷史測試資料！ (內建離線模式，不消耗 API 額度)")
     display_matches = [{
@@ -65,10 +64,8 @@ else:
         display_matches = [m for m in all_matches if m.get("utcDate", "").startswith(today_str)]
 
         if not display_matches:
-            st.info(f"⚽ 今日 ({datetime.now().strftime('%Y-%m-%d')}) 暫無進行中的世界盃賽事。\n(提示：2026世界盃首場分組賽將於台北時間 6/12 03:00 正式開踢！)")
+            st.info(f"⚽ 今日 ({today_str}) 暫無進行中的世界盃賽事。\n(提示：2026世界盃首場分組賽將於台北時間 6/12 正式開踢！)")
             is_error = True
-        else:
-            st.success(f"✅ 成功抓取 {len(display_matches)} 場資料！")
 
 if not is_error and display_matches:
     status_map = {
@@ -77,8 +74,10 @@ if not is_error and display_matches:
     }
     
     for match in display_matches:
-        home = match.get("homeTeam", {}).get("name", "未知名稱")
-        away = match.get("awayTeam", {}).get("name", "未知名稱")
+        home_en = match.get("homeTeam", {}).get("name", "未知名稱")
+        away_en = match.get("awayTeam", {}).get("name", "未知名稱")
+        home = TEAM_TRANSLATION.get(home_en, home_en)
+        away = TEAM_TRANSLATION.get(away_en, away_en)
         
         score_data = match.get("score", {}).get("fullTime", {})
         h_score = score_data.get("home")
