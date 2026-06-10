@@ -1,13 +1,13 @@
 import streamlit as st
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ==========================================
 # 1. API 設定區
 # ==========================================
 API_TOKEN = "d5921a999fd5418aa3c5026db3889cf2"
 
-# 全球球隊中英文名稱翻譯字典 (確保動態抓取時畫面上顯示流暢中文)
+# 全球球隊中英文名稱翻譯字典
 TEAM_TRANSLATION = {
     "Mexico": "墨西哥", "South Africa": "南非", "South Korea": "韓國", "Czech Republic": "捷克",
     "Canada": "加拿大", "Bosnia and Herzegovina": "波赫", "Qatar": "卡達", "Switzerland": "瑞士",
@@ -48,13 +48,13 @@ GROUP_MAP = {
 }
 
 # ==========================================
-# 2. 自動連網抓取函式 (Football-Data.org 專用)
+# 2. 自動連網抓取與時間轉換函式
 # ==========================================
 @st.cache_data(ttl=60)
-def fetch_all_matches(season="2026"):
+def fetch_all_matches():
     url = "https://api.football-data.org/v4/competitions/WC/matches"
     headers = {"X-Auth-Token": API_TOKEN}
-    params = {"season": season}
+    params = {"season": "2026"} # 永遠鎖定 2026 賽季
     try:
         response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
@@ -65,6 +65,14 @@ def fetch_all_matches(season="2026"):
             return {"error": f"國際伺服器回應錯誤 (代碼 {response.status_code})"}
     except Exception as e:
         return {"error": f"系統連線異常：{e}"}
+
+# 轉換 UTC 時間為台北時間 (UTC+8)
+def get_taipei_time(utc_date_str):
+    try:
+        utc_dt = datetime.strptime(utc_date_str, "%Y-%m-%dT%H:%M:%SZ")
+        return utc_dt + timedelta(hours=8)
+    except:
+        return None
 
 # ==========================================
 # 3. 賽程卡片渲染輔助功能
@@ -82,19 +90,16 @@ def display_match_item(match):
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
     
-    # 格式化顯示時間
-    utc_date = match.get("utcDate", "")
-    try:
-        dt_display = utc_date.replace("T", " ").replace("Z", "")[:16]
-    except:
-        dt_display = utc_date
+    # 格式化顯示台北時間
+    tpe_dt = get_taipei_time(match.get("utcDate", ""))
+    dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else match.get("utcDate", "")
 
     if h_score is not None and a_score is not None:
         score_display = f"【{h_score} : {a_score}】 ({status_text})"
     else:
-        score_display = f"【尚未開賽】 (預計時間: {dt_display})"
+        score_display = f"【尚未開賽】"
         
-    st.markdown(f"🕒 {dt_display} &nbsp;&nbsp; **{home} VS {away}** &nbsp;&nbsp; `{score_display}`")
+    st.markdown(f"🕒 {dt_display} (台北時間) &nbsp;&nbsp; **{home} VS {away}** &nbsp;&nbsp; `{score_display}`")
 
 # ==========================================
 # 4. 主程式介面與排版
@@ -107,10 +112,7 @@ st.markdown("美加墨聯合主辦｜動態比分全自動同步系統")
 if st.button("🔄 立即刷新、同步最新戰況", use_container_width=True):
     st.cache_data.clear()
 
-mode = st.radio("資料庫模式：", ["正式模式 (2026真實賽況)", "測試模式 (2022歷史回顧)"], horizontal=True)
-target_season = "2022" if "2022" in mode else "2026"
-
-result = fetch_all_matches(season=target_season)
+result = fetch_all_matches()
 
 if "error" in result:
     st.error(f"❌ {result['error']}")
@@ -126,7 +128,7 @@ else:
         ko_matches = [m for m in all_matches if m.get("stage") in ko_stages]
         
         if not ko_matches:
-            st.info("⚽ 淘汰賽組合將於分組賽結束後自動生成。")
+            st.info("⚽ 淘汰賽組合將於分組賽結束後由官方自動生成。")
         else:
             for stage_code in reversed(ko_stages):
                 stage_matches = [m for m in ko_matches if m.get("stage") == stage_code]
@@ -141,7 +143,7 @@ else:
         group_matches = [m for m in all_matches if m.get("stage") == "GROUP_STAGE"]
         
         if not group_matches:
-            st.info("⚽ 暫無分組賽程數據。")
+            st.info("⚽ 目前伺服器暫無分組賽程數據。")
         else:
             all_groups = sorted(list(set([m.get("group") for m in group_matches if m.get("group")])))
             for g_code in all_groups:
@@ -153,15 +155,18 @@ else:
     # 【分頁3：今日即時焦點】
     with tab3:
         st.subheader("開源伺服器當日同步")
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        # 取得台北時間的「今天日期」
+        today_tpe_date = (datetime.utcnow() + timedelta(hours=8)).date()
         
-        if target_season == "2022":
-            today_matches = [m for m in all_matches if m.get("stage") == "FINAL"]
-        else:
-            today_matches = [m for m in all_matches if m.get("utcDate", "").startswith(today_str)]
+        # 篩選出台北時間為今天的賽事
+        today_matches = []
+        for m in all_matches:
+            m_tpe_dt = get_taipei_time(m.get("utcDate", ""))
+            if m_tpe_dt and m_tpe_dt.date() == today_tpe_date:
+                today_matches.append(m)
             
         if not today_matches:
-            st.info(f"⚽ 今日 ({today_str}) 暫無進行中的世界盃賽事。\n(提示：2026世界盃首場分組賽將於台北時間 6/12 正式開踢！)")
+            st.info(f"⚽ 台北時間今日 ({today_tpe_date.strftime('%Y-%m-%d')}) 暫無進行中的世界盃賽事。\n(提示：2026世界盃首場分組賽將於台北時間 6/12 03:00 正式開踢！)")
         else:
             st.success(f"✅ 成功同步今日 {len(today_matches)} 場賽事！")
             for match in today_matches:
@@ -179,8 +184,12 @@ else:
                 status_raw = match.get("status", "UNKNOWN")
                 status_text = STATUS_MAP.get(status_raw, status_raw)
                 
+                # 顯示台北時間
+                tpe_dt = get_taipei_time(match.get("utcDate", ""))
+                time_str = tpe_dt.strftime("%H:%M") if tpe_dt else ""
+                
                 st.markdown("---")
-                st.markdown(f"### 🏟️ {home} 🆚 {away}")
+                st.markdown(f"### 🏟️ {home} 🆚 {away} <span style='font-size: 16px; color: gray;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
                 col1, col2, col3 = st.columns(3)
                 col1.metric(label=home, value=h_score)
                 col2.metric(label="賽事狀態", value=status_text)
