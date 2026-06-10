@@ -54,7 +54,7 @@ GROUP_MAP = {
 def fetch_all_matches():
     url = "https://api.football-data.org/v4/competitions/WC/matches"
     headers = {"X-Auth-Token": API_TOKEN}
-    params = {"season": "2026"} # 永遠鎖定 2026 賽季
+    params = {"season": "2026"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
@@ -62,9 +62,25 @@ def fetch_all_matches():
         elif response.status_code == 429:
             return {"error": "已達到每分鐘請求次數限制，請等候一分鐘後再刷新。"}
         else:
-            return {"error": f"國際伺服器回應錯誤 (代碼 {response.status_code})"}
+            return {"error": f"國際伺服器賽程回應錯誤 (代碼 {response.status_code})"}
     except Exception as e:
         return {"error": f"系統連線異常：{e}"}
+
+@st.cache_data(ttl=60)
+def fetch_standings():
+    url = "https://api.football-data.org/v4/competitions/WC/standings"
+    headers = {"X-Auth-Token": API_TOKEN}
+    params = {"season": "2026"}
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        if response.status_code == 200:
+            return {"data": response.json().get("standings", [])}
+        elif response.status_code == 429:
+            return {"error": "已達到每分鐘請求次數限制，請等候一分鐘。"}
+        else:
+            return {"error": f"國際伺服器積分回應錯誤 (代碼 {response.status_code})"}
+    except Exception as e:
+        return {"error": f"積分連線異常：{e}"}
 
 # 轉換 UTC 時間為台北時間 (UTC+8)
 def get_taipei_time(utc_date_str):
@@ -74,9 +90,7 @@ def get_taipei_time(utc_date_str):
     except:
         return None
 
-# ==========================================
-# 3. 賽程卡片渲染輔助功能
-# ==========================================
+# 賽程卡片渲染輔助功能
 def display_match_item(match):
     home_en = match.get("homeTeam", {}).get("name", "Unknown")
     away_en = match.get("awayTeam", {}).get("name", "Unknown")
@@ -90,7 +104,6 @@ def display_match_item(match):
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
     
-    # 格式化顯示台北時間
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else match.get("utcDate", "")
 
@@ -102,26 +115,28 @@ def display_match_item(match):
     st.markdown(f"🕒 {dt_display} (台北時間) &nbsp;&nbsp; **{home} VS {away}** &nbsp;&nbsp; `{score_display}`")
 
 # ==========================================
-# 4. 主程式介面與排版
+# 3. 主程式介面與排版
 # ==========================================
-st.set_page_config(page_title="2026世足全自動動態看板", page_icon="🏆", layout="centered")
+st.set_page_config(page_title="2026世足動態全功能看板", page_icon="🏆", layout="centered")
 
-st.title("🏆 2026 世足賽程與即時比分")
-st.markdown("美加墨聯合主辦｜動態比分全自動同步系統")
+st.title("🏆 2026 世足賽動態看板")
+st.markdown("美加墨聯合主辦｜賽程・即時比分・分組積分全自動同步系統")
 
-if st.button("🔄 立即刷新、同步最新戰況", use_container_width=True):
+if st.button("🔄 立即刷新、同步最新數據", use_container_width=True):
     st.cache_data.clear()
 
-result = fetch_all_matches()
+# 同步讀取兩組 API 數據
+matches_result = fetch_all_matches()
+standings_result = fetch_standings()
 
-if "error" in result:
-    st.error(f"❌ {result['error']}")
+if "error" in matches_result:
+    st.error(f"❌ 賽程載入失敗：{matches_result['error']}")
 else:
-    all_matches = result.get("data", [])
+    all_matches = matches_result.get("data", [])
     
-    tab1, tab2, tab3 = st.tabs(["🏆 淘汰賽戰況", "⚽ 分組賽進度", "📡 今日即時焦點"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🏆 淘汰賽戰況", "⚽ 分組賽進度", "📊 各組積分表", "📡 今日即時焦點"])
     
-    # 【分頁1：淘汰賽 (動態刷新)】
+    # 【分頁1：淘汰賽】
     with tab1:
         st.subheader("世界盃淘汰賽最新戰況")
         ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
@@ -137,28 +152,58 @@ else:
                         for m in stage_matches:
                             display_match_item(m)
 
-    # 【分頁2：分組賽 (動態刷新)】
+    # 【分頁2：分組賽】
     with tab2:
         st.subheader("48強分組賽動態賽程")
-        group_matches = [m for m in all_matches if m.get("stage") == "GROUP_STAGE"]
+        g_matches_list = [m for m in all_matches if m.get("stage") == "GROUP_STAGE"]
         
-        if not group_matches:
+        if not g_matches_list:
             st.info("⚽ 目前伺服器暫無分組賽程數據。")
         else:
-            all_groups = sorted(list(set([m.get("group") for m in group_matches if m.get("group")])))
+            all_groups = sorted(list(set([m.get("group") for m in g_matches_list if m.get("group")])))
             for g_code in all_groups:
-                g_matches = [m for m in group_matches if m.get("group") == g_code]
-                with st.expander(f"📍 {GROUP_MAP.get(g_code, g_code)} 賽程進度與比分"):
+                g_matches = [m for m in g_matches_list if m.get("group") == g_code]
+                with st.expander(f"📍 {GROUP_MAP.get(g_code, g_code)} 賽程進度"):
                     for m in g_matches:
                         display_match_item(m)
 
-    # 【分頁3：今日即時焦點】
+    # 【分頁3：各組積分表】
     with tab3:
+        st.subheader("2026 世界盃小組積分榜")
+        if "error" in standings_result:
+            st.error(f"❌ 積分表同步失敗：{standings_result['error']}")
+        else:
+            standings_data = standings_result.get("data", [])
+            if not standings_data:
+                st.info("⚽ 官方尚未上傳分組積分表數據。")
+            else:
+                for group_data in standings_data:
+                    g_code = group_data.get("group")
+                    g_name = GROUP_MAP.get(g_code, g_code)
+                    
+                    st.write(f"#### 📍 {g_name}")
+                    table_rows = []
+                    for entry in group_data.get("table", []):
+                        team_en = entry.get("team", {}).get("name", "Unknown")
+                        team_zh = TEAM_TRANSLATION.get(team_en, team_en)
+                        table_rows.append({
+                            "排名": entry.get("position"),
+                            "球隊": team_zh,
+                            "已賽": entry.get("playedGames"),
+                            "勝": entry.get("won"),
+                            "和": entry.get("draw"),
+                            "敗": entry.get("lost"),
+                            "進球/失球": f"{entry.get('goalsFor')} / {entry.get('goalsAgainst')}",
+                            "得失球差": entry.get("goalDifference"),
+                            "積分": entry.get("points")
+                        })
+                    st.dataframe(table_rows, use_container_width=True, hide_index=True)
+
+    # 【分頁4：今日即時焦點】
+    with tab4:
         st.subheader("開源伺服器當日同步")
-        # 取得台北時間的「今天日期」
         today_tpe_date = (datetime.utcnow() + timedelta(hours=8)).date()
         
-        # 篩選出台北時間為今天的賽事
         today_matches = []
         for m in all_matches:
             m_tpe_dt = get_taipei_time(m.get("utcDate", ""))
@@ -184,12 +229,11 @@ else:
                 status_raw = match.get("status", "UNKNOWN")
                 status_text = STATUS_MAP.get(status_raw, status_raw)
                 
-                # 顯示台北時間
                 tpe_dt = get_taipei_time(match.get("utcDate", ""))
                 time_str = tpe_dt.strftime("%H:%M") if tpe_dt else ""
                 
                 st.markdown("---")
-                st.markdown(f"### 🏟️ {home} 🆚 {away} <span style='font-size: 16px; color: gray;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
+                st.markdown(f"### 🏟️ {home} 🆚 {away} <span style='font-size: 14px; color: gray;'>({time_str} 台北時間開踢)</span>", unsafe_allow_html=True)
                 col1, col2, col3 = st.columns(3)
                 col1.metric(label=home, value=h_score)
                 col2.metric(label="賽事狀態", value=status_text)
