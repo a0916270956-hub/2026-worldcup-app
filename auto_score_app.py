@@ -115,24 +115,35 @@ def display_match_item(match):
     c2.metric(label="賽事狀態", value=status_text)
     c3.metric(label=away, value=a_display)
     
-    with st.expander("📊 查看賽事詳細統計數據"):
+    with st.expander("📊 查看賽後攻防統計與進球名單"):
         ht = score_obj.get('halfTime', {}) or {}
         et = score_obj.get('extraTime', {}) or {}
         pk = score_obj.get('penalties', {}) or {}
         
-        ht_str = f"{ht.get('home')} : {ht.get('away')}" if ht.get('home') is not None else "-"
-        et_str = f"{et.get('home')} : {et.get('away')}" if et.get('home') is not None else "無"
-        pk_str = f"{pk.get('home')} : {pk.get('away')}" if pk.get('home') is not None else "無"
-        
         sc1, sc2, sc3 = st.columns(3)
-        sc1.metric("半場比分", ht_str)
-        sc2.metric("延長賽", et_str)
-        sc3.metric("PK 戰", pk_str)
+        sc1.metric("半場比分", f"{ht.get('home', '-')} : {ht.get('away', '-')}")
+        sc2.metric("延長賽", f"{et.get('home', '-')} : {et.get('away', '-')}" if et.get('home') is not None else "無")
+        sc3.metric("PK 戰", f"{pk.get('home', '-')} : {pk.get('away', '-')}" if pk.get('home') is not None else "無")
         
-        referees = match.get("referees", [])
-        if referees:
-            ref_names = "、".join([r.get("name", "") for r in referees])
-            st.caption(f"👨‍⚖️ **執法裁判團**：{ref_names}")
+        st.markdown("---")
+        goals = match.get("goals", [])
+        st.markdown("**⚽ 進攻紀錄 (進球者)**")
+        if goals:
+            for g in goals:
+                scorer = g.get("scorer", {}).get("name", "Unknown")
+                minute = g.get("minute", "")
+                team_name_en = g.get("team", {}).get("name", "")
+                team_zh = TEAM_TRANSLATION.get(team_name_en.strip(), team_name_en)
+                st.caption(f"⏱️ {minute}' - {scorer} ({team_zh})")
+        else:
+            st.caption("尚無進球紀錄。")
+
+        st.markdown("**📈 進階攻防數據**")
+        stats = match.get("statistics")
+        if stats:
+            st.json(stats)
+        else:
+            st.info("💡 官方免費版 API 預設不提供批量控球率、射門次數等數據。")
 
 # ==========================================
 # 3. 網頁介面
@@ -144,7 +155,7 @@ st.title("🏆 2026 世足賽即時數據觀測台")
 if st.button("🔄 強制同步最新數據", use_container_width=True):
     st.cache_data.clear()
 
-sub_tab1, sub_tab2 = st.tabs(["📡 今日即時比分", "📊 各組積分表"])
+sub_tab1, sub_tab2 = st.tabs(["📡 今日與次日賽程", "📊 各組積分表"])
 
 with sub_tab1:
     match_res = fetch_scores()
@@ -152,14 +163,33 @@ with sub_tab1:
         st.error(f"❌ 連線異常：{match_res['error']}")
     else:
         all_m = match_res.get("data", [])
-        today_tpe = (datetime.utcnow() + timedelta(hours=8)).date()
+        today_tpe_date = (datetime.utcnow() + timedelta(hours=8)).date()
+        tomorrow_tpe_date = today_tpe_date + timedelta(days=1)
         
-        display_matches = [m for m in all_m if get_taipei_time(m.get("utcDate", "")) and get_taipei_time(m.get("utcDate", "")).date() == today_tpe]
+        today_matches = []
+        tomorrow_matches = []
+        for m in all_m:
+            m_tpe_dt = get_taipei_time(m.get("utcDate", ""))
+            if m_tpe_dt:
+                if m_tpe_dt.date() == today_tpe_date:
+                    today_matches.append(m)
+                elif m_tpe_dt.date() == tomorrow_tpe_date:
+                    tomorrow_matches.append(m)
 
-        if not display_matches:
-            st.info(f"⚽ 今日 ({today_tpe.strftime('%Y-%m-%d')}) 暫無世界盃賽事。\n(提示：2026世界盃首場分組賽將於台北時間 6/12 03:00 開踢！)")
+        st.subheader(f"🔥 今日賽事 ({today_tpe_date.strftime('%m/%d')})")
+        if not today_matches:
+            st.info("⚽ 今日暫無世界盃賽事。")
         else:
-            for match in display_matches:
+            for match in today_matches:
+                display_match_item(match)
+                
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        st.subheader(f"📅 明日預告 ({tomorrow_tpe_date.strftime('%m/%d')})")
+        if not tomorrow_matches:
+            st.info("⚽ 明日暫無賽事安排。")
+        else:
+            for match in tomorrow_matches:
                 display_match_item(match)
 
 with sub_tab2:
