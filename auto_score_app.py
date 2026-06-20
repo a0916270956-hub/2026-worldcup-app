@@ -35,7 +35,7 @@ TEAM_TRANSLATION = {
     "Ukraine": "烏克蘭", "Russia": "俄羅斯", "Iceland": "冰島", "Finland": "芬蘭",
     "Norway": "挪威", "Slovenia": "斯洛維尼亞", "Albania": "阿爾巴尼亞", 
     "North Macedonia": "北馬其頓", "Georgia": "喬治亞", "Armenia": "亞美尼亞", "Israel": "以色列",
-    "Cape Verde": "維德角"
+    "Cape Verde": "維德角", "TBD": "待定 (TBD)"
 }
 
 GROUP_MAP = {
@@ -87,10 +87,42 @@ def get_taipei_time(utc_date_str):
     except:
         return None
 
-def display_match_item(match):
-    home_en = match.get("homeTeam", {}).get("name") or "Unknown"
-    away_en = match.get("awayTeam", {}).get("name") or "Unknown"
+def get_match_card_html(match):
+    home_en = match.get("homeTeam", {}).get("name") or "TBD"
+    away_en = match.get("awayTeam", {}).get("name") or "TBD"
+    home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
+    away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
+
+    score_obj = match.get("score", {}) or {}
+    full_time = score_obj.get("fullTime", {}) or {}
+    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
+    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
+
+    status_raw = match.get("status", "UNKNOWN")
+    status_text = STATUS_MAP.get(status_raw, status_raw)
     
+    tpe_dt = get_taipei_time(match.get("utcDate", ""))
+    dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "未知時間"
+    status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
+
+    html = f"""
+    <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-bottom: 12px; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 6px; font-weight: 500;">{dt_display} | {status_text}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="font-size: 14px; font-weight: 600; color: #333;">{home}</span>
+            <span style="font-size: 16px; font-weight: bold; color: #1E88E5;">{h_score}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 14px; font-weight: 600; color: #333;">{away}</span>
+            <span style="font-size: 16px; font-weight: bold; color: #1E88E5;">{a_score}</span>
+        </div>
+    </div>
+    """
+    return html
+
+def display_match_item(match):
+    home_en = match.get("homeTeam", {}).get("name") or "TBD"
+    away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
     
@@ -148,14 +180,14 @@ def display_match_item(match):
 # ==========================================
 # 3. 網頁介面
 # ==========================================
-st.set_page_config(page_title="世足賽即時看板(獨立版)", layout="centered")
+st.set_page_config(page_title="世足賽即時看板(獨立版)", layout="wide")
 
 st.title("🏆 2026 世足賽即時數據觀測台")
 
 if st.button("🔄 強制同步最新數據", use_container_width=True):
     st.cache_data.clear()
 
-sub_tab1, sub_tab2 = st.tabs(["📡 今日與次日賽程", "📊 各組積分表"])
+sub_tab1, sub_tab2, sub_tab3 = st.tabs(["📡 今日與次日賽程", "🌳 晉級樹狀圖", "📊 各組積分表"])
 
 with sub_tab1:
     match_res = fetch_scores()
@@ -193,6 +225,41 @@ with sub_tab1:
                 display_match_item(match)
 
 with sub_tab2:
+    st.subheader("🌳 淘汰賽晉級樹狀圖")
+    if "error" not in match_res:
+        tree_stages = ["LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
+        tree_matches = [m for m in all_m if m.get("stage") in tree_stages]
+        
+        if not tree_matches:
+            st.info("⚽ 淘汰賽樹狀圖將於晉級名單確定後自動生成。")
+        else:
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.markdown("<h4 style='text-align: center; color: #424242;'>🎯 16強賽</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "LAST_16":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            with c2:
+                st.markdown("<h4 style='text-align: center; color: #424242;'>⚔️ 8強賽</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "QUARTER_FINALS":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            with c3:
+                st.markdown("<h4 style='text-align: center; color: #424242;'>⭐ 4強賽</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "SEMI_FINALS":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            with c4:
+                st.markdown("<h4 style='text-align: center; color: #FF8F00;'>🏆 冠軍戰</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "FINAL":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+                st.markdown("<h4 style='text-align: center; color: #8D6E63; margin-top: 20px;'>🥉 季軍戰</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "THIRD_PLACE":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+
+with sub_tab3:
     st.subheader("小組最新積分排行榜")
     stand_res = fetch_standings()
     if "error" in stand_res:
@@ -207,7 +274,7 @@ with sub_tab2:
                 st.write(f"#### 📍 {g_name}")
                 table_rows = []
                 for entry in group_data.get("table", []):
-                    team_en = entry.get("team", {}).get("name") or "Unknown"
+                    team_en = entry.get("team", {}).get("name") or "TBD"
                     team_zh = TEAM_TRANSLATION.get(team_en.strip(), team_en)
                     
                     table_rows.append({
