@@ -35,7 +35,22 @@ TEAM_TRANSLATION = {
     "Ukraine": "烏克蘭", "Russia": "俄羅斯", "Iceland": "冰島", "Finland": "芬蘭",
     "Norway": "挪威", "Slovenia": "斯洛維尼亞", "Albania": "阿爾巴尼亞", 
     "North Macedonia": "北馬其頓", "Georgia": "喬治亞", "Armenia": "亞美尼亞", "Israel": "以色列",
-    "Cape Verde": "維德角", "TBD": "待定 (TBD)"
+    "Cape Verde": "維德角", "TBD": "待定"
+}
+
+TEAM_RANKING = {
+    "Argentina": 1, "France": 2, "Belgium": 3, "England": 4, "Brazil": 5, "Portugal": 6, 
+    "Netherlands": 7, "Spain": 8, "Italy": 9, "Croatia": 10, "United States": 11, "USA": 11, 
+    "Colombia": 12, "Morocco": 13, "Mexico": 14, "Uruguay": 15, "Germany": 16, "Senegal": 17, 
+    "Japan": 18, "Switzerland": 19, "Iran": 20, "Iran (Islamic Republic of)": 20, "Denmark": 21, 
+    "Ukraine": 22, "Korea Republic": 23, "South Korea": 23, "Australia": 24, "Austria": 25, 
+    "Sweden": 26, "Hungary": 27, "Wales": 28, "Poland": 29, "Nigeria": 30, "Ecuador": 31, 
+    "Peru": 32, "Serbia": 33, "Qatar": 34, "Russia": 35, "Czechia": 36, "Czech Republic": 36, 
+    "Egypt": 37, "Côte d'Ivoire": 38, "Ivory Coast": 38, "Scotland": 39, "Türkiye": 40, "Turkey": 40, 
+    "Tunisia": 41, "Algeria": 43, "Mali": 44, "Panama": 45, "Romania": 46, "Norway": 47, "Slovakia": 48, 
+    "Canada": 49, "Greece": 50, "Venezuela": 54, "Saudi Arabia": 53, "South Africa": 59, 
+    "Republic of Ireland": 60, "Ghana": 68, "Iceland": 72, "Northern Ireland": 73, "Georgia": 75, 
+    "Bulgaria": 83, "China PR": 88, "Syria": 89, "New Zealand": 104
 }
 
 GROUP_MAP = {
@@ -92,6 +107,11 @@ def get_match_card_html(match):
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
+    
+    home_rank = TEAM_RANKING.get(home_en.strip(), "-")
+    away_rank = TEAM_RANKING.get(away_en.strip(), "-")
+    h_rank_str = f" <span style='font-size:10px; color:#9E9E9E;'>#{home_rank}</span>" if home_rank != "-" else ""
+    a_rank_str = f" <span style='font-size:10px; color:#9E9E9E;'>#{away_rank}</span>" if away_rank != "-" else ""
 
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
@@ -109,11 +129,11 @@ def get_match_card_html(match):
         f'<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 170px;">'
         f'<div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 8px; font-weight: bold;">{dt_display} | {status_text}</div>'
         f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">'
-        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{home}</span>'
+        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{home}{h_rank_str}</span>'
         f'<span style="font-size: 15px; font-weight: 900; color: #1E88E5;">{h_score}</span>'
         f'</div>'
         f'<div style="display: flex; justify-content: space-between; align-items: center;">'
-        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{away}</span>'
+        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{away}{a_rank_str}</span>'
         f'<span style="font-size: 15px; font-weight: 900; color: #1E88E5;">{a_score}</span>'
         f'</div>'
         f'</div>'
@@ -125,6 +145,11 @@ def display_match_item(match):
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
+    
+    home_rank = TEAM_RANKING.get(home_en.strip(), "-")
+    away_rank = TEAM_RANKING.get(away_en.strip(), "-")
+    h_rank_tag = f" <span style='font-size: 13px; color: #1E88E5; font-weight:normal;'>(排:#{home_rank})</span>" if home_rank != "-" else ""
+    a_rank_tag = f" <span style='font-size: 13px; color: #1E88E5; font-weight:normal;'>(排:#{away_rank})</span>" if away_rank != "-" else ""
     
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
@@ -138,7 +163,7 @@ def display_match_item(match):
     time_str = tpe_dt.strftime("%H:%M") if tpe_dt else ""
     
     st.markdown("---")
-    st.markdown(f"### 🏟️ {home} 🆚 {away} <span style='font-size: 14px; color: gray;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
+    st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
     
     h_display = 0 if h_score is None else h_score
     a_display = 0 if a_score is None else a_score
@@ -270,9 +295,13 @@ with sub_tab3:
                 for entry in group_data.get("table", []):
                     team_en = entry.get("team", {}).get("name") or "TBD"
                     team_zh = TEAM_TRANSLATION.get(team_en.strip(), team_en)
+                    team_rank = TEAM_RANKING.get(team_en.strip(), "-")
                     
                     table_rows.append({
-                        "排名": entry.get("position"), "球隊": team_zh, "已賽": entry.get("playedGames"),
+                        "排名": entry.get("position"), 
+                        "球隊": team_zh, 
+                        "世界排名": team_rank,
+                        "已賽": entry.get("playedGames"),
                         "勝": entry.get("won"), "和": entry.get("draw"), "敗": entry.get("lost"),
                         "積分": entry.get("points")
                     })
