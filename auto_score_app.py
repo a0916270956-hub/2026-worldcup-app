@@ -106,15 +106,15 @@ def get_match_card_html(match):
     status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
 
     html = f"""
-    <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-bottom: 12px; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 6px; font-weight: 500;">{dt_display} | {status_text}</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <span style="font-size: 14px; font-weight: 600; color: #333;">{home}</span>
-            <span style="font-size: 16px; font-weight: bold; color: #1E88E5;">{h_score}</span>
+    <div style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 10px; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="font-size: 10px; color: {status_color}; text-align: center; margin-bottom: 5px; font-weight: 500;">{dt_display} | {status_text}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+            <span style="font-size: 13px; font-weight: 600; color: #333;">{home}</span>
+            <span style="font-size: 14px; font-weight: bold; color: #1E88E5;">{h_score}</span>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 14px; font-weight: 600; color: #333;">{away}</span>
-            <span style="font-size: 16px; font-weight: bold; color: #1E88E5;">{a_score}</span>
+            <span style="font-size: 13px; font-weight: 600; color: #333;">{away}</span>
+            <span style="font-size: 14px; font-weight: bold; color: #1E88E5;">{a_score}</span>
         </div>
     </div>
     """
@@ -227,34 +227,39 @@ with sub_tab1:
 with sub_tab2:
     st.subheader("🌳 淘汰賽晉級樹狀圖")
     if "error" not in match_res:
-        tree_stages = ["LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
+        tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
         tree_matches = [m for m in all_m if m.get("stage") in tree_stages]
         
         if not tree_matches:
             st.info("⚽ 淘汰賽樹狀圖將於晉級名單確定後自動生成。")
         else:
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4, c5 = st.columns(5)
             with c1:
-                st.markdown("<h4 style='text-align: center; color: #424242;'>🎯 16強賽</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>🚀 32強賽</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "LAST_32":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            with c2:
+                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>🎯 16強賽</h4>", unsafe_allow_html=True)
                 for m in tree_matches:
                     if m.get("stage") == "LAST_16":
                         st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-            with c2:
-                st.markdown("<h4 style='text-align: center; color: #424242;'>⚔️ 8強賽</h4>", unsafe_allow_html=True)
+            with c3:
+                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>⚔️ 8強賽</h4>", unsafe_allow_html=True)
                 for m in tree_matches:
                     if m.get("stage") == "QUARTER_FINALS":
                         st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-            with c3:
-                st.markdown("<h4 style='text-align: center; color: #424242;'>⭐ 4強賽</h4>", unsafe_allow_html=True)
+            with c4:
+                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>⭐ 4強賽</h4>", unsafe_allow_html=True)
                 for m in tree_matches:
                     if m.get("stage") == "SEMI_FINALS":
                         st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-            with c4:
-                st.markdown("<h4 style='text-align: center; color: #FF8F00;'>🏆 冠軍戰</h4>", unsafe_allow_html=True)
+            with c5:
+                st.markdown("<h4 style='text-align: center; color: #FF8F00; font-size: 16px;'>🏆 冠軍戰</h4>", unsafe_allow_html=True)
                 for m in tree_matches:
                     if m.get("stage") == "FINAL":
                         st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-                st.markdown("<h4 style='text-align: center; color: #8D6E63; margin-top: 20px;'>🥉 季軍戰</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='text-align: center; color: #8D6E63; margin-top: 20px; font-size: 16px;'>🥉 季軍戰</h4>", unsafe_allow_html=True)
                 for m in tree_matches:
                     if m.get("stage") == "THIRD_PLACE":
                         st.markdown(get_match_card_html(m), unsafe_allow_html=True)
