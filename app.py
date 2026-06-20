@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 # ==========================================
 API_TOKEN = "d5921a999fd5418aa3c5026db3889cf2"
 
-# 🌟 全球球隊中英文名稱翻譯字典
 TEAM_TRANSLATION = {
     "Argentina": "阿根廷", "France": "法國", "Croatia": "克羅埃西亞", "Morocco": "摩洛哥",
     "Netherlands": "荷蘭", "England": "英格蘭", "Brazil": "巴西", "Portugal": "葡萄牙",
@@ -36,7 +35,7 @@ TEAM_TRANSLATION = {
     "Ukraine": "烏克蘭", "Russia": "俄羅斯", "Iceland": "冰島", "Finland": "芬蘭",
     "Norway": "挪威", "Slovenia": "斯洛維尼亞", "Albania": "阿爾巴尼亞", 
     "North Macedonia": "北馬其頓", "Georgia": "喬治亞", "Armenia": "亞美尼亞", "Israel": "以色列",
-    "Cape Verde": "維德角"
+    "Cape Verde": "維德角", "TBD": "待定 (TBD)"
 }
 
 STATUS_MAP = {
@@ -97,12 +96,47 @@ def get_taipei_time(utc_date_str):
         return None
 
 # ==========================================
-# 3. UI 模組：賽事卡片與攻防數據渲染
+# 3. UI 模組：賽事卡片、樹狀圖節點與攻防數據渲染
 # ==========================================
-def display_match_item(match, display_date=True):
-    home_en = match.get("homeTeam", {}).get("name") or "Unknown"
-    away_en = match.get("awayTeam", {}).get("name") or "Unknown"
+def get_match_card_html(match):
+    """用於樹狀圖的精美 HTML 視覺卡片"""
+    home_en = match.get("homeTeam", {}).get("name") or "TBD"
+    away_en = match.get("awayTeam", {}).get("name") or "TBD"
+    home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
+    away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
+
+    score_obj = match.get("score", {}) or {}
+    full_time = score_obj.get("fullTime", {}) or {}
+    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
+    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
+
+    status_raw = match.get("status", "UNKNOWN")
+    status_text = STATUS_MAP.get(status_raw, status_raw)
     
+    tpe_dt = get_taipei_time(match.get("utcDate", ""))
+    dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "未知時間"
+    
+    status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
+
+    html = f"""
+    <div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; margin-bottom: 12px; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 6px; font-weight: 500;">{dt_display} | {status_text}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span style="font-size: 14px; font-weight: 600; color: #333;">{home}</span>
+            <span style="font-size: 16px; font-weight: bold; color: #1E88E5;">{h_score}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 14px; font-weight: 600; color: #333;">{away}</span>
+            <span style="font-size: 16px; font-weight: bold; color: #1E88E5;">{a_score}</span>
+        </div>
+    </div>
+    """
+    return html
+
+def display_match_item(match, display_date=True):
+    """用於條列式清單的排版模組"""
+    home_en = match.get("homeTeam", {}).get("name") or "TBD"
+    away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
     
@@ -110,10 +144,8 @@ def display_match_item(match, display_date=True):
     full_time = score_obj.get("fullTime", {}) or {}
     h_score = full_time.get("home")
     a_score = full_time.get("away")
-    
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
-    
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     
     st.markdown("---")
@@ -131,9 +163,7 @@ def display_match_item(match, display_date=True):
     col2.metric(label="賽事狀態", value=status_text)
     col3.metric(label=away, value=a_display)
     
-    # 📊 賽後詳細數據與進球名單區塊
     with st.expander("📊 查看賽後攻防統計與進球名單"):
-        # 比分拆解
         ht = score_obj.get('halfTime', {}) or {}
         et = score_obj.get('extraTime', {}) or {}
         pk = score_obj.get('penalties', {}) or {}
@@ -144,7 +174,6 @@ def display_match_item(match, display_date=True):
         sc3.metric("PK 戰", f"{pk.get('home', '-')} : {pk.get('away', '-')}" if pk.get('home') is not None else "無")
         
         st.markdown("---")
-        # 攻防進階數據：進球者紀錄
         goals = match.get("goals", [])
         st.markdown("**⚽ 進攻紀錄 (進球者)**")
         if goals:
@@ -157,9 +186,8 @@ def display_match_item(match, display_date=True):
         else:
             st.caption("尚無進球紀錄。")
 
-        # 其他進階數據提示與裁判資訊
         st.markdown("**📈 進階攻防數據**")
-        stats = match.get("statistics") # 預留給未來付費或官方釋出時自動抓取
+        stats = match.get("statistics")
         if stats:
             st.json(stats)
         else:
@@ -173,10 +201,10 @@ def display_match_item(match, display_date=True):
 # ==========================================
 # 4. 主程式排版
 # ==========================================
-st.set_page_config(page_title="2026世足動態全功能看板", page_icon="🏆", layout="centered")
+st.set_page_config(page_title="2026世足動態全功能看板", page_icon="🏆", layout="wide")
 
 st.title("🏆 2026 世足賽動態看板")
-st.markdown("美加墨聯合主辦｜賽程・即時比分・分組積分全自動同步系統")
+st.markdown("美加墨聯合主辦｜賽程・即時比分・分組積分・晉級樹狀圖全自動同步")
 
 if st.button("🔄 立即刷新、同步最新數據", use_container_width=True):
     st.cache_data.clear()
@@ -189,11 +217,12 @@ if "error" in matches_result:
 else:
     all_matches = matches_result.get("data", [])
     
-    tab1, tab2, tab3, tab4 = st.tabs(["🏆 淘汰賽戰況", "⚽ 分組賽進度", "📊 各組積分表", "📡 今日與次日焦點"])
+    # 增加樹狀圖分頁
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 淘汰賽列表", "🌳 晉級樹狀圖", "⚽ 分組賽進度", "📊 各組積分表", "📡 今日與次日焦點"])
     
-    # 【分頁1：淘汰賽】
+    # 【分頁1：淘汰賽列表】
     with tab1:
-        st.subheader("世界盃淘汰賽最新戰況")
+        st.subheader("世界盃淘汰賽最新戰況 (列表模式)")
         ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
         ko_matches = [m for m in all_matches if m.get("stage") in ko_stages]
         
@@ -207,8 +236,47 @@ else:
                         for m in stage_matches:
                             display_match_item(m, display_date=True)
 
-    # 【分頁2：分組賽】
+    # 【分頁2：晉級樹狀圖 (新功能)】
     with tab2:
+        st.subheader("🌳 淘汰賽晉級樹狀圖 (Bracket)")
+        # 抓取 16強到決賽的資料做樹狀圖 (可視情況擴增至 32 強)
+        tree_stages = ["LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
+        tree_matches = [m for m in all_matches if m.get("stage") in tree_stages]
+        
+        if not tree_matches:
+            st.info("⚽ 淘汰賽樹狀圖將於晉級名單確定後自動生成。")
+        else:
+            # 建立四個欄位呈現樹狀流向
+            c1, c2, c3, c4 = st.columns(4)
+            
+            with c1:
+                st.markdown("<h4 style='text-align: center; color: #424242;'>🎯 16強賽</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "LAST_16":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            with c2:
+                st.markdown("<h4 style='text-align: center; color: #424242;'>⚔️ 8強賽</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "QUARTER_FINALS":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            with c3:
+                st.markdown("<h4 style='text-align: center; color: #424242;'>⭐ 4強賽</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "SEMI_FINALS":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            with c4:
+                st.markdown("<h4 style='text-align: center; color: #FF8F00;'>🏆 冠軍戰</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "FINAL":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+                
+                st.markdown("<h4 style='text-align: center; color: #8D6E63; margin-top: 20px;'>🥉 季軍戰</h4>", unsafe_allow_html=True)
+                for m in tree_matches:
+                    if m.get("stage") == "THIRD_PLACE":
+                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+
+    # 【分頁3：分組賽】
+    with tab3:
         st.subheader("48強分組賽動態賽程")
         g_matches_list = [m for m in all_matches if m.get("stage") == "GROUP_STAGE"]
         
@@ -222,8 +290,8 @@ else:
                     for m in g_matches:
                         display_match_item(m, display_date=True)
 
-    # 【分頁3：積分表】
-    with tab3:
+    # 【分頁4：積分表】
+    with tab4:
         st.subheader("2026 世界盃小組積分榜")
         if "error" in standings_result:
             st.error(f"❌ 積分表同步失敗：{standings_result['error']}")
@@ -239,7 +307,7 @@ else:
                     st.write(f"#### 📍 {g_name}")
                     table_rows = []
                     for entry in group_data.get("table", []):
-                        team_en = entry.get("team", {}).get("name") or "Unknown"
+                        team_en = entry.get("team", {}).get("name") or "TBD"
                         team_zh = TEAM_TRANSLATION.get(team_en.strip(), team_en)
                         table_rows.append({
                             "排名": entry.get("position"), "球隊": team_zh, "已賽": entry.get("playedGames"),
@@ -249,8 +317,8 @@ else:
                         })
                     st.dataframe(table_rows, use_container_width=True, hide_index=True)
 
-    # 【分頁4：今日與次日焦點】
-    with tab4:
+    # 【分頁5：今日與次日焦點】
+    with tab5:
         today_tpe_date = (datetime.utcnow() + timedelta(hours=8)).date()
         tomorrow_tpe_date = today_tpe_date + timedelta(days=1)
         
@@ -264,7 +332,6 @@ else:
                 elif m_tpe_dt.date() == tomorrow_tpe_date:
                     tomorrow_matches.append(m)
         
-        # 顯示今日賽事
         st.subheader(f"🔥 今日焦點賽事 ({today_tpe_date.strftime('%m/%d')})")
         if not today_matches:
             st.info("⚽ 今日暫無賽事。")
@@ -274,7 +341,6 @@ else:
                 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # 顯示次日賽事
         st.subheader(f"📅 明日賽程預告 ({tomorrow_tpe_date.strftime('%m/%d')})")
         if not tomorrow_matches:
             st.info("⚽ 明日暫無賽事安排。")
