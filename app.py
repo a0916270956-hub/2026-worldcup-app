@@ -3,7 +3,7 @@ import requests
 from datetime import datetime, timedelta
 
 # ==========================================
-# 1. API 設定區
+# 1. API 設定區與內部資料庫
 # ==========================================
 API_TOKEN = "d5921a999fd5418aa3c5026db3889cf2"
 
@@ -35,7 +35,23 @@ TEAM_TRANSLATION = {
     "Ukraine": "烏克蘭", "Russia": "俄羅斯", "Iceland": "冰島", "Finland": "芬蘭",
     "Norway": "挪威", "Slovenia": "斯洛維尼亞", "Albania": "阿爾巴尼亞", 
     "North Macedonia": "北馬其頓", "Georgia": "喬治亞", "Armenia": "亞美尼亞", "Israel": "以色列",
-    "Cape Verde": "維德角", "TBD": "待定 (TBD)"
+    "Cape Verde": "維德角", "TBD": "待定"
+}
+
+# 🌟 內部 FIFA 世界排名資料庫 (依據最新官方排名快取)
+TEAM_RANKING = {
+    "Argentina": 1, "France": 2, "Belgium": 3, "England": 4, "Brazil": 5, "Portugal": 6, 
+    "Netherlands": 7, "Spain": 8, "Italy": 9, "Croatia": 10, "United States": 11, "USA": 11, 
+    "Colombia": 12, "Morocco": 13, "Mexico": 14, "Uruguay": 15, "Germany": 16, "Senegal": 17, 
+    "Japan": 18, "Switzerland": 19, "Iran": 20, "Iran (Islamic Republic of)": 20, "Denmark": 21, 
+    "Ukraine": 22, "Korea Republic": 23, "South Korea": 23, "Australia": 24, "Austria": 25, 
+    "Sweden": 26, "Hungary": 27, "Wales": 28, "Poland": 29, "Nigeria": 30, "Ecuador": 31, 
+    "Peru": 32, "Serbia": 33, "Qatar": 34, "Russia": 35, "Czechia": 36, "Czech Republic": 36, 
+    "Egypt": 37, "Côte d'Ivoire": 38, "Ivory Coast": 38, "Scotland": 39, "Türkiye": 40, "Turkey": 40, 
+    "Tunisia": 41, "Algeria": 43, "Mali": 44, "Panama": 45, "Romania": 46, "Norway": 47, "Slovakia": 48, 
+    "Canada": 49, "Greece": 50, "Venezuela": 54, "Saudi Arabia": 53, "South Africa": 59, 
+    "Republic of Ireland": 60, "Ghana": 68, "Iceland": 72, "Northern Ireland": 73, "Georgia": 75, 
+    "Bulgaria": 83, "China PR": 88, "Syria": 89, "New Zealand": 104
 }
 
 STATUS_MAP = {
@@ -67,8 +83,6 @@ def fetch_all_matches():
         response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
             return {"data": response.json().get("matches", [])}
-        elif response.status_code == 429:
-            return {"error": "已達到每分鐘請求次數限制，請等候一分鐘後再刷新。"}
         else:
             return {"error": f"國際伺服器賽程回應錯誤 (代碼 {response.status_code})"}
     except Exception as e:
@@ -96,14 +110,19 @@ def get_taipei_time(utc_date_str):
         return None
 
 # ==========================================
-# 3. UI 模組：賽事卡片、樹狀圖節點與攻防數據渲染
+# 3. UI 模組：包含世界排名顯示
 # ==========================================
 def get_match_card_html(match):
-    """用於樹狀圖的精美 HTML 視覺卡片 (解決縮排亂碼問題，並升級樣式)"""
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
+    
+    # 取得排名，若無則顯示 "-"
+    home_rank = TEAM_RANKING.get(home_en.strip(), "-")
+    away_rank = TEAM_RANKING.get(away_en.strip(), "-")
+    h_rank_str = f" <span style='font-size:10px; color:#9E9E9E;'>#{home_rank}</span>" if home_rank != "-" else ""
+    a_rank_str = f" <span style='font-size:10px; color:#9E9E9E;'>#{away_rank}</span>" if away_rank != "-" else ""
 
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
@@ -112,21 +131,19 @@ def get_match_card_html(match):
 
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
-    
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "未知時間"
     status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
 
-    # 使用括號將長字串包起來，避免任何可能導致 Markdown 誤判的縮排
     html = (
         f'<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 170px;">'
         f'<div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 8px; font-weight: bold;">{dt_display} | {status_text}</div>'
         f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">'
-        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{home}</span>'
+        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{home}{h_rank_str}</span>'
         f'<span style="font-size: 15px; font-weight: 900; color: #1E88E5;">{h_score}</span>'
         f'</div>'
         f'<div style="display: flex; justify-content: space-between; align-items: center;">'
-        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{away}</span>'
+        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{away}{a_rank_str}</span>'
         f'<span style="font-size: 15px; font-weight: 900; color: #1E88E5;">{a_score}</span>'
         f'</div>'
         f'</div>'
@@ -139,6 +156,11 @@ def display_match_item(match, display_date=True):
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
     
+    home_rank = TEAM_RANKING.get(home_en.strip(), "-")
+    away_rank = TEAM_RANKING.get(away_en.strip(), "-")
+    h_rank_tag = f" <span style='font-size: 13px; color: #1E88E5; font-weight:normal;'>(排:#{home_rank})</span>" if home_rank != "-" else ""
+    a_rank_tag = f" <span style='font-size: 13px; color: #1E88E5; font-weight:normal;'>(排:#{away_rank})</span>" if away_rank != "-" else ""
+
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
     h_score = full_time.get("home")
@@ -150,10 +172,10 @@ def display_match_item(match, display_date=True):
     st.markdown("---")
     if display_date:
         dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else match.get("utcDate", "")
-        st.markdown(f"### 🏟️ {home} 🆚 {away} <span style='font-size: 14px; color: gray;'>({dt_display} 台北時間)</span>", unsafe_allow_html=True)
+        st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({dt_display} 台北時間)</span>", unsafe_allow_html=True)
     else:
         time_str = tpe_dt.strftime("%H:%M") if tpe_dt else ""
-        st.markdown(f"### 🏟️ {home} 🆚 {away} <span style='font-size: 14px; color: gray;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
+        st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
 
     h_display = 0 if h_score is None else h_score
     a_display = 0 if a_score is None else a_score
@@ -192,11 +214,6 @@ def display_match_item(match, display_date=True):
         else:
             st.info("💡 官方免費版 API 預設不提供批量控球率、射門次數等數據。")
 
-        referees = match.get("referees", [])
-        if referees:
-            ref_names = "、".join([r.get("name", "") for r in referees])
-            st.caption(f"👨‍⚖️ **執法裁判團**：{ref_names}")
-
 # ==========================================
 # 4. 主程式排版
 # ==========================================
@@ -218,12 +235,10 @@ else:
     
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 淘汰賽列表", "🌳 晉級樹狀圖", "⚽ 分組賽進度", "📊 各組積分表", "📡 今日與次日焦點"])
     
-    # 【分頁1：淘汰賽列表】
     with tab1:
         st.subheader("世界盃淘汰賽最新戰況 (列表模式)")
         ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
         ko_matches = [m for m in all_matches if m.get("stage") in ko_stages]
-        
         if not ko_matches:
             st.info("⚽ 淘汰賽組合將於分組賽結束後由官方自動生成。")
         else:
@@ -234,14 +249,11 @@ else:
                         for m in stage_matches:
                             display_match_item(m, display_date=True)
 
-    # 【分頁2：晉級樹狀圖 - 滑動無亂碼版】
     with tab2:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (Bracket)")
         st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖")
-        
         tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
         tree_matches = [m for m in all_matches if m.get("stage") in tree_stages]
-        
         if not tree_matches:
             st.info("⚽ 淘汰賽樹狀圖將於晉級名單確定後自動生成。")
         else:
@@ -251,7 +263,6 @@ else:
                 if stage in col_html:
                     col_html[stage] += get_match_card_html(m)
                     
-            # 絕對沒有任何縮排的字串拼接，確保 Streamlit 不會把它當成 Markdown 程式碼區塊
             bracket_html = (
                 '<div style="overflow-x: auto; padding-bottom: 20px; background-color: #f0f2f6; padding: 20px; border-radius: 12px; margin-top: 10px;">'
                 '<div style="display: flex; min-width: 1000px; gap: 15px;">'
@@ -265,11 +276,9 @@ else:
             )
             st.markdown(bracket_html, unsafe_allow_html=True)
 
-    # 【分頁3：分組賽】
     with tab3:
         st.subheader("48強分組賽動態賽程")
         g_matches_list = [m for m in all_matches if m.get("stage") == "GROUP_STAGE"]
-        
         if not g_matches_list:
             st.info("⚽ 目前伺服器暫無分組賽程數據。")
         else:
@@ -280,7 +289,7 @@ else:
                     for m in g_matches:
                         display_match_item(m, display_date=True)
 
-    # 【分頁4：積分表】
+    # 📊 積分表：加入世界排名專屬欄位
     with tab4:
         st.subheader("2026 世界盃小組積分榜")
         if "error" in standings_result:
@@ -299,15 +308,19 @@ else:
                     for entry in group_data.get("table", []):
                         team_en = entry.get("team", {}).get("name") or "TBD"
                         team_zh = TEAM_TRANSLATION.get(team_en.strip(), team_en)
+                        team_rank = TEAM_RANKING.get(team_en.strip(), "-")
+                        
                         table_rows.append({
-                            "排名": entry.get("position"), "球隊": team_zh, "已賽": entry.get("playedGames"),
+                            "排名": entry.get("position"), 
+                            "球隊": team_zh, 
+                            "世界排名": team_rank,
+                            "已賽": entry.get("playedGames"),
                             "勝": entry.get("won"), "和": entry.get("draw"), "敗": entry.get("lost"),
-                            "進球/失球": f"{entry.get('goalsFor')} / {entry.get('goalsAgainst')}",
+                            "進/失球": f"{entry.get('goalsFor')}/{entry.get('goalsAgainst')}",
                             "得失差": entry.get("goalDifference"), "積分": entry.get("points")
                         })
                     st.dataframe(table_rows, use_container_width=True, hide_index=True)
 
-    # 【分頁5：今日與次日焦點】
     with tab5:
         today_tpe_date = (datetime.utcnow() + timedelta(hours=8)).date()
         tomorrow_tpe_date = today_tpe_date + timedelta(days=1)
