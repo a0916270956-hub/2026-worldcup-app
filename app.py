@@ -99,7 +99,7 @@ def get_taipei_time(utc_date_str):
 # 3. UI 模組：賽事卡片、樹狀圖節點與攻防數據渲染
 # ==========================================
 def get_match_card_html(match):
-    """用於樹狀圖的精美 HTML 視覺卡片 (針對 5 欄寬度優化)"""
+    """用於樹狀圖的精美 HTML 視覺卡片"""
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
@@ -118,16 +118,15 @@ def get_match_card_html(match):
     
     status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
 
-    # 微調 padding 與 font-size 讓卡片在 5 欄中不會爆框
     html = f"""
-    <div style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 10px; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 10px; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-width: 160px;">
         <div style="font-size: 10px; color: {status_color}; text-align: center; margin-bottom: 5px; font-weight: 500;">{dt_display} | {status_text}</div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-            <span style="font-size: 13px; font-weight: 600; color: #333;">{home}</span>
+            <span style="font-size: 13px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">{home}</span>
             <span style="font-size: 14px; font-weight: bold; color: #1E88E5;">{h_score}</span>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 13px; font-weight: 600; color: #333;">{away}</span>
+            <span style="font-size: 13px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">{away}</span>
             <span style="font-size: 14px; font-weight: bold; color: #1E88E5;">{a_score}</span>
         </div>
     </div>
@@ -135,7 +134,6 @@ def get_match_card_html(match):
     return html
 
 def display_match_item(match, display_date=True):
-    """用於條列式清單的排版模組"""
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
@@ -236,49 +234,54 @@ else:
                         for m in stage_matches:
                             display_match_item(m, display_date=True)
 
-    # 【分頁2：晉級樹狀圖】
+    # 【分頁2：晉級樹狀圖 - 手機滑動版】
     with tab2:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (Bracket)")
-        # 涵蓋 32強 到 決賽
+        st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖")
+        
         tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
         tree_matches = [m for m in all_matches if m.get("stage") in tree_stages]
         
         if not tree_matches:
             st.info("⚽ 淘汰賽樹狀圖將於晉級名單確定後自動生成。")
         else:
-            # 建立五個欄位呈現樹狀流向
-            c1, c2, c3, c4, c5 = st.columns(5)
-            
-            with c1:
-                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>🚀 32強賽</h4>", unsafe_allow_html=True)
-                for m in tree_matches:
-                    if m.get("stage") == "LAST_32":
-                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-            with c2:
-                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>🎯 16強賽</h4>", unsafe_allow_html=True)
-                for m in tree_matches:
-                    if m.get("stage") == "LAST_16":
-                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-            with c3:
-                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>⚔️ 8強賽</h4>", unsafe_allow_html=True)
-                for m in tree_matches:
-                    if m.get("stage") == "QUARTER_FINALS":
-                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-            with c4:
-                st.markdown("<h4 style='text-align: center; color: #424242; font-size: 16px;'>⭐ 4強賽</h4>", unsafe_allow_html=True)
-                for m in tree_matches:
-                    if m.get("stage") == "SEMI_FINALS":
-                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-            with c5:
-                st.markdown("<h4 style='text-align: center; color: #FF8F00; font-size: 16px;'>🏆 冠軍戰</h4>", unsafe_allow_html=True)
-                for m in tree_matches:
-                    if m.get("stage") == "FINAL":
-                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
-                
-                st.markdown("<h4 style='text-align: center; color: #8D6E63; margin-top: 20px; font-size: 16px;'>🥉 季軍戰</h4>", unsafe_allow_html=True)
-                for m in tree_matches:
-                    if m.get("stage") == "THIRD_PLACE":
-                        st.markdown(get_match_card_html(m), unsafe_allow_html=True)
+            # 準備各階段的 HTML 卡片字串
+            col_html = {"LAST_32": "", "LAST_16": "", "QUARTER_FINALS": "", "SEMI_FINALS": "", "FINAL": "", "THIRD_PLACE": ""}
+            for m in tree_matches:
+                stage = m.get("stage")
+                if stage in col_html:
+                    col_html[stage] += get_match_card_html(m)
+                    
+            # 建構強制橫向捲軸的 HTML 架構 (min-width 保證不被壓縮)
+            bracket_html = f"""
+            <div style="overflow-x: auto; padding-bottom: 20px;">
+                <div style="display: flex; min-width: 1000px; gap: 15px;">
+                    <div style="flex: 1;">
+                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>🚀 32強賽</h4>
+                        {col_html["LAST_32"]}
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>🎯 16強賽</h4>
+                        {col_html["LAST_16"]}
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>⚔️ 8強賽</h4>
+                        {col_html["QUARTER_FINALS"]}
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>⭐ 4強賽</h4>
+                        {col_html["SEMI_FINALS"]}
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style='text-align: center; color: #FF8F00; font-size: 16px;'>🏆 冠軍戰</h4>
+                        {col_html["FINAL"]}
+                        <h4 style='text-align: center; color: #8D6E63; margin-top: 20px; font-size: 16px;'>🥉 季軍戰</h4>
+                        {col_html["THIRD_PLACE"]}
+                    </div>
+                </div>
+            </div>
+            """
+            st.markdown(bracket_html, unsafe_allow_html=True)
 
     # 【分頁3：分組賽】
     with tab3:
