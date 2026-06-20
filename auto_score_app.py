@@ -105,19 +105,19 @@ def get_match_card_html(match):
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "未知時間"
     status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
 
-    html = f"""
-    <div style="border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; margin-bottom: 10px; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-width: 160px;">
-        <div style="font-size: 10px; color: {status_color}; text-align: center; margin-bottom: 5px; font-weight: 500;">{dt_display} | {status_text}</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-            <span style="font-size: 13px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">{home}</span>
-            <span style="font-size: 14px; font-weight: bold; color: #1E88E5;">{h_score}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 13px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">{away}</span>
-            <span style="font-size: 14px; font-weight: bold; color: #1E88E5;">{a_score}</span>
-        </div>
-    </div>
-    """
+    html = (
+        f'<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 170px;">'
+        f'<div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 8px; font-weight: bold;">{dt_display} | {status_text}</div>'
+        f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">'
+        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{home}</span>'
+        f'<span style="font-size: 15px; font-weight: 900; color: #1E88E5;">{h_score}</span>'
+        f'</div>'
+        f'<div style="display: flex; justify-content: space-between; align-items: center;">'
+        f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{away}</span>'
+        f'<span style="font-size: 15px; font-weight: 900; color: #1E88E5;">{a_score}</span>'
+        f'</div>'
+        f'</div>'
+    )
     return html
 
 def display_match_item(match):
@@ -240,34 +240,17 @@ with sub_tab2:
                 if stage in col_html:
                     col_html[stage] += get_match_card_html(m)
                     
-            bracket_html = f"""
-            <div style="overflow-x: auto; padding-bottom: 20px;">
-                <div style="display: flex; min-width: 1000px; gap: 15px;">
-                    <div style="flex: 1;">
-                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>🚀 32強賽</h4>
-                        {col_html["LAST_32"]}
-                    </div>
-                    <div style="flex: 1;">
-                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>🎯 16強賽</h4>
-                        {col_html["LAST_16"]}
-                    </div>
-                    <div style="flex: 1;">
-                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>⚔️ 8強賽</h4>
-                        {col_html["QUARTER_FINALS"]}
-                    </div>
-                    <div style="flex: 1;">
-                        <h4 style='text-align: center; color: #424242; font-size: 16px;'>⭐ 4強賽</h4>
-                        {col_html["SEMI_FINALS"]}
-                    </div>
-                    <div style="flex: 1;">
-                        <h4 style='text-align: center; color: #FF8F00; font-size: 16px;'>🏆 冠軍戰</h4>
-                        {col_html["FINAL"]}
-                        <h4 style='text-align: center; color: #8D6E63; margin-top: 20px; font-size: 16px;'>🥉 季軍戰</h4>
-                        {col_html["THIRD_PLACE"]}
-                    </div>
-                </div>
-            </div>
-            """
+            bracket_html = (
+                '<div style="overflow-x: auto; padding-bottom: 20px; background-color: #f0f2f6; padding: 20px; border-radius: 12px; margin-top: 10px;">'
+                '<div style="display: flex; min-width: 1000px; gap: 15px;">'
+                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">🚀 32強賽</h4>' + col_html["LAST_32"] + '</div>'
+                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">🎯 16強賽</h4>' + col_html["LAST_16"] + '</div>'
+                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">⚔️ 8強賽</h4>' + col_html["QUARTER_FINALS"] + '</div>'
+                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">⭐ 4強賽</h4>' + col_html["SEMI_FINALS"] + '</div>'
+                '<div style="flex: 1;"><h4 style="text-align: center; color: #FF8F00; font-size: 16px; margin-bottom:15px;">🏆 冠軍戰</h4>' + col_html["FINAL"] +
+                '<h4 style="text-align: center; color: #8D6E63; margin-top: 30px; font-size: 16px; margin-bottom:15px;">🥉 季軍戰</h4>' + col_html["THIRD_PLACE"] + '</div>'
+                '</div></div>'
+            )
             st.markdown(bracket_html, unsafe_allow_html=True)
 
 with sub_tab3:
