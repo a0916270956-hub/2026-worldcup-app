@@ -21,10 +21,11 @@ TEAM_TRANSLATION = {
     "Sweden": "瑞典", "Nigeria": "奈及利亞", "Egypt": "埃及", "Algeria": "阿爾及利亞",
     "Côte d'Ivoire": "象牙海岸", "Ivory Coast": "象牙海岸", "Mali": "馬利",
     "Burkina Faso": "布吉納法索", "South Africa": "南非", "Congo DR": "剛果民主共和國",
-    "DR Congo": "剛果民主共和國", "Bosnia and Herzegovina": "波赫", "Czechia": "捷克",
-    "Czech Republic": "捷克", "Republic of Ireland": "愛爾蘭", "Northern Ireland": "北愛爾蘭",
-    "Scotland": "蘇格蘭", "Austria": "奧地利", "Hungary": "匈牙利", "Slovakia": "斯洛伐克",
-    "Paraguay": "巴拉圭", "Venezuela": "委內瑞拉", "Bolivia": "玻利維亞", "New Zealand": "紐西蘭",
+    "DR Congo": "剛果民主共和國", "Bosnia and Herzegovina": "波赫", "Bosnia-Herzegovina": "波赫", 
+    "Czechia": "捷克", "Czech Republic": "捷克", "Republic of Ireland": "愛爾蘭", 
+    "Northern Ireland": "北愛爾蘭", "Scotland": "蘇格蘭", "Austria": "奧地利", 
+    "Hungary": "匈牙利", "Slovakia": "斯洛伐克", "Paraguay": "巴拉圭", 
+    "Venezuela": "委內瑞拉", "Bolivia": "玻利維亞", "New Zealand": "紐西蘭",
     "Haiti": "海地", "Jamaica": "牙買加", "Honduras": "宏都拉斯", "El Salvador": "薩爾瓦多",
     "Panama": "巴拿馬", "Cuba": "古巴", "Trinidad and Tobago": "千里達及托巴哥",
     "Curaçao": "古拉索", "Iraq": "伊拉克", "Syria": "敘利亞", "United Arab Emirates": "阿聯酋",
@@ -35,10 +36,10 @@ TEAM_TRANSLATION = {
     "Ukraine": "烏克蘭", "Russia": "俄羅斯", "Iceland": "冰島", "Finland": "芬蘭",
     "Norway": "挪威", "Slovenia": "斯洛維尼亞", "Albania": "阿爾巴尼亞", 
     "North Macedonia": "北馬其頓", "Georgia": "喬治亞", "Armenia": "亞美尼亞", "Israel": "以色列",
-    "Cape Verde": "維德角", "TBD": "待定"
+    "Cape Verde": "維德角", "Cape Verde Islands": "維德角", "TBD": "待定"
 }
 
-# 🌟 內部 FIFA 世界排名資料庫 (依據最新官方排名快取)
+# 🌟 內部 FIFA 世界排名資料庫
 TEAM_RANKING = {
     "Argentina": 1, "France": 2, "Belgium": 3, "England": 4, "Brazil": 5, "Portugal": 6, 
     "Netherlands": 7, "Spain": 8, "Italy": 9, "Croatia": 10, "United States": 11, "USA": 11, 
@@ -51,7 +52,8 @@ TEAM_RANKING = {
     "Tunisia": 41, "Algeria": 43, "Mali": 44, "Panama": 45, "Romania": 46, "Norway": 47, "Slovakia": 48, 
     "Canada": 49, "Greece": 50, "Venezuela": 54, "Saudi Arabia": 53, "South Africa": 59, 
     "Republic of Ireland": 60, "Ghana": 68, "Iceland": 72, "Northern Ireland": 73, "Georgia": 75, 
-    "Bulgaria": 83, "China PR": 88, "Syria": 89, "New Zealand": 104
+    "Bulgaria": 83, "China PR": 88, "Syria": 89, "New Zealand": 104, "Bosnia and Herzegovina": 74,
+    "Bosnia-Herzegovina": 74, "Cape Verde": 65, "Cape Verde Islands": 65
 }
 
 STATUS_MAP = {
@@ -118,7 +120,6 @@ def get_match_card_html(match):
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
     
-    # 取得排名，若無則顯示 "-"
     home_rank = TEAM_RANKING.get(home_en.strip(), "-")
     away_rank = TEAM_RANKING.get(away_en.strip(), "-")
     h_rank_str = f" <span style='font-size:10px; color:#9E9E9E;'>#{home_rank}</span>" if home_rank != "-" else ""
@@ -289,7 +290,6 @@ else:
                     for m in g_matches:
                         display_match_item(m, display_date=True)
 
-    # 📊 積分表：加入世界排名專屬欄位
     with tab4:
         st.subheader("2026 世界盃小組積分榜")
         if "error" in standings_result:
@@ -344,7 +344,8 @@ else:
                 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        st.subheader(f"📅 明日賽程預告 ({tomorrow_tpe_date.strftime('%m/%d')})")
+        # 替換了會顯示奇怪日期的日曆符號，改為通用箭頭圖示
+        st.subheader(f"🔜 明日賽程預告 ({tomorrow_tpe_date.strftime('%m/%d')})")
         if not tomorrow_matches:
             st.info("⚽ 明日暫無賽事安排。")
         else:
