@@ -58,7 +58,7 @@ TEAM_RANKING = {
 
 STATUS_MAP = {
     "FINISHED": "比賽結束", "IN_PLAY": "進行中", "PAUSED": "中場休息",
-    "TIMED": "未開始", "SCHEDULED": "已排程", "POSTPONED": "延期"
+    "TIMED": "未開始", "SCHEDULED": "預定賽程", "POSTPONED": "延期"
 }
 
 STAGE_MAP = {
@@ -74,7 +74,7 @@ GROUP_MAP = {
 }
 
 # ==========================================
-# 2. 自動連網抓取與時間轉換函式
+# 2. 自動連網抓取與智慧預填機制
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_all_matches():
@@ -111,6 +111,32 @@ def get_taipei_time(utc_date_str):
     except:
         return None
 
+def get_mock_knockout_matches():
+    """當官方 API 淘汰賽國家未定時，自動注入此 2026 預定對戰表"""
+    mock_matches = []
+    r32_teams = [
+        ("A組 首名", "小組第三 (待定)"), ("B組 次名", "C組 次名"),
+        ("D組 首名", "小組第三 (待定)"), ("E組 次名", "F組 次名"),
+        ("G組 首名", "小組第三 (待定)"), ("H組 次名", "I組 次名"),
+        ("J組 首名", "小組第三 (待定)"), ("K組 次名", "L組 次名"),
+        ("B組 首名", "小組第三 (待定)"), ("A組 次名", "D組 次名"),
+        ("C組 首名", "小組第三 (待定)"), ("E組 首名", "H組 首名"),
+        ("F組 首名", "小組第三 (待定)"), ("G組 次名", "J組 次名"),
+        ("I組 首名", "小組第三 (待定)"), ("K組 首名", "L組 首名")
+    ]
+    for h, a in r32_teams:
+        mock_matches.append({"stage": "LAST_32", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": h}, "awayTeam": {"name": a}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    for _ in range(8):
+        mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強 晉級隊"}, "awayTeam": {"name": "32強 晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    for _ in range(4):
+        mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "16強 晉級隊"}, "awayTeam": {"name": "16強 晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    for _ in range(2):
+        mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "8強 晉級隊"}, "awayTeam": {"name": "8強 晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    
+    mock_matches.append({"stage": "FINAL", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽 勝者"}, "awayTeam": {"name": "準決賽 勝者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    mock_matches.append({"stage": "THIRD_PLACE", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽 敗者"}, "awayTeam": {"name": "準決賽 敗者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    return mock_matches
+
 # ==========================================
 # 3. UI 模組：包含世界排名顯示
 # ==========================================
@@ -133,7 +159,7 @@ def get_match_card_html(match):
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
-    dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "未知時間"
+    dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "預定賽程"
     status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
 
     html = (
@@ -164,22 +190,22 @@ def display_match_item(match, display_date=True):
 
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
-    h_score = full_time.get("home")
-    a_score = full_time.get("away")
+    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
+    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     
     st.markdown("---")
     if display_date:
-        dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else match.get("utcDate", "")
-        st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({dt_display} 台北時間)</span>", unsafe_allow_html=True)
+        dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "等待官方排定時間"
+        st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({dt_display})</span>", unsafe_allow_html=True)
     else:
-        time_str = tpe_dt.strftime("%H:%M") if tpe_dt else ""
+        time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "預定"
         st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
 
-    h_display = 0 if h_score is None else h_score
-    a_display = 0 if a_score is None else a_score
+    h_display = 0 if h_score is "-" else h_score
+    a_display = 0 if a_score is "-" else a_score
     col1, col2, col3 = st.columns(3)
     col1.metric(label=home, value=h_display)
     col2.metric(label="賽事狀態", value=status_text)
@@ -234,48 +260,51 @@ if "error" in matches_result:
 else:
     all_matches = matches_result.get("data", [])
     
+    # 智慧攔截：如果淘汰賽 API 傳回的都是未定名單，則注入預定賽程表
+    ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
+    ko_matches = [m for m in all_matches if m.get("stage") in ko_stages]
+    ko_has_teams = any((m.get("homeTeam", {}).get("name") not in [None, "TBD", "Unknown"]) for m in ko_matches)
+    
+    if not ko_has_teams:
+        all_matches = [m for m in all_matches if m.get("stage") not in ko_stages]
+        all_matches.extend(get_mock_knockout_matches())
+        
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 淘汰賽列表", "🌳 晉級樹狀圖", "⚽ 分組賽進度", "📊 各組積分表", "📡 今日與次日焦點"])
     
     with tab1:
         st.subheader("世界盃淘汰賽最新戰況 (列表模式)")
-        ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
-        ko_matches = [m for m in all_matches if m.get("stage") in ko_stages]
-        if not ko_matches:
-            st.info("⚽ 淘汰賽組合將於分組賽結束後由官方自動生成。")
-        else:
-            for stage_code in reversed(ko_stages):
-                stage_matches = [m for m in ko_matches if m.get("stage") == stage_code]
-                if stage_matches:
-                    with st.expander(STAGE_MAP.get(stage_code, stage_code)):
-                        for m in stage_matches:
-                            display_match_item(m, display_date=True)
+        ko_matches_updated = [m for m in all_matches if m.get("stage") in ko_stages]
+        for stage_code in reversed(ko_stages):
+            stage_matches = [m for m in ko_matches_updated if m.get("stage") == stage_code]
+            if stage_matches:
+                with st.expander(STAGE_MAP.get(stage_code, stage_code)):
+                    for m in stage_matches:
+                        display_match_item(m, display_date=True)
 
     with tab2:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (Bracket)")
         st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖")
         tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
         tree_matches = [m for m in all_matches if m.get("stage") in tree_stages]
-        if not tree_matches:
-            st.info("⚽ 淘汰賽樹狀圖將於晉級名單確定後自動生成。")
-        else:
-            col_html = {"LAST_32": "", "LAST_16": "", "QUARTER_FINALS": "", "SEMI_FINALS": "", "FINAL": "", "THIRD_PLACE": ""}
-            for m in tree_matches:
-                stage = m.get("stage")
-                if stage in col_html:
-                    col_html[stage] += get_match_card_html(m)
-                    
-            bracket_html = (
-                '<div style="overflow-x: auto; padding-bottom: 20px; background-color: #f0f2f6; padding: 20px; border-radius: 12px; margin-top: 10px;">'
-                '<div style="display: flex; min-width: 1000px; gap: 15px;">'
-                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">🚀 32強賽</h4>' + col_html["LAST_32"] + '</div>'
-                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">🎯 16強賽</h4>' + col_html["LAST_16"] + '</div>'
-                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">⚔️ 8強賽</h4>' + col_html["QUARTER_FINALS"] + '</div>'
-                '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">⭐ 4強賽</h4>' + col_html["SEMI_FINALS"] + '</div>'
-                '<div style="flex: 1;"><h4 style="text-align: center; color: #FF8F00; font-size: 16px; margin-bottom:15px;">🏆 冠軍戰</h4>' + col_html["FINAL"] +
-                '<h4 style="text-align: center; color: #8D6E63; margin-top: 30px; font-size: 16px; margin-bottom:15px;">🥉 季軍戰</h4>' + col_html["THIRD_PLACE"] + '</div>'
-                '</div></div>'
-            )
-            st.markdown(bracket_html, unsafe_allow_html=True)
+        
+        col_html = {"LAST_32": "", "LAST_16": "", "QUARTER_FINALS": "", "SEMI_FINALS": "", "FINAL": "", "THIRD_PLACE": ""}
+        for m in tree_matches:
+            stage = m.get("stage")
+            if stage in col_html:
+                col_html[stage] += get_match_card_html(m)
+                
+        bracket_html = (
+            '<div style="overflow-x: auto; padding-bottom: 20px; background-color: #f0f2f6; padding: 20px; border-radius: 12px; margin-top: 10px;">'
+            '<div style="display: flex; min-width: 1000px; gap: 15px;">'
+            '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">🚀 32強賽</h4>' + col_html["LAST_32"] + '</div>'
+            '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">🎯 16強賽</h4>' + col_html["LAST_16"] + '</div>'
+            '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">⚔️ 8強賽</h4>' + col_html["QUARTER_FINALS"] + '</div>'
+            '<div style="flex: 1;"><h4 style="text-align: center; color: #424242; font-size: 16px; margin-bottom:15px;">⭐ 4強賽</h4>' + col_html["SEMI_FINALS"] + '</div>'
+            '<div style="flex: 1;"><h4 style="text-align: center; color: #FF8F00; font-size: 16px; margin-bottom:15px;">🏆 冠軍戰</h4>' + col_html["FINAL"] +
+            '<h4 style="text-align: center; color: #8D6E63; margin-top: 30px; font-size: 16px; margin-bottom:15px;">🥉 季軍戰</h4>' + col_html["THIRD_PLACE"] + '</div>'
+            '</div></div>'
+        )
+        st.markdown(bracket_html, unsafe_allow_html=True)
 
     with tab3:
         st.subheader("48強分組賽動態賽程")
