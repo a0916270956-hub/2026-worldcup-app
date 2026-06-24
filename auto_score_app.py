@@ -66,6 +66,12 @@ STATUS_MAP = {
     "TIMED": "未開始", "SCHEDULED": "預定賽程", "POSTPONED": "延期"
 }
 
+def is_real_team(team_name):
+    if not team_name: return False
+    fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "晉級", "首名", "次名", "勝者", "敗者", "UNKNOWN"]
+    name_upper = str(team_name).upper()
+    return not any(kw in name_upper for kw in fake_keywords)
+
 # ==========================================
 # 2. 核心數據抓取與智慧預填
 # ==========================================
@@ -107,26 +113,26 @@ def get_taipei_time(utc_date_str):
 def get_mock_knockout_matches():
     mock_matches = []
     r32_teams = [
-        ("A組 首名", "小組第三 (待定)"), ("B組 次名", "C組 次名"),
-        ("D組 首名", "小組第三 (待定)"), ("E組 次名", "F組 次名"),
-        ("G組 首名", "小組第三 (待定)"), ("H組 次名", "I組 次名"),
-        ("J組 首名", "小組第三 (待定)"), ("K組 次名", "L組 次名"),
-        ("B組 首名", "小組第三 (待定)"), ("A組 次名", "D組 次名"),
-        ("C組 首名", "小組第三 (待定)"), ("E組 首名", "H組 首名"),
-        ("F組 首名", "小組第三 (待定)"), ("G組 次名", "J組 次名"),
-        ("I組 首名", "小組第三 (待定)"), ("K組 首名", "L組 首名")
+        ("A組 首名", "待定 (小組第三)"), ("B組 次名", "C組 次名"),
+        ("D組 首名", "待定 (小組第三)"), ("E組 次名", "F組 次名"),
+        ("G組 首名", "待定 (小組第三)"), ("H組 次名", "I組 次名"),
+        ("J組 首名", "待定 (小組第三)"), ("K組 次名", "L組 次名"),
+        ("B組 首名", "待定 (小組第三)"), ("A組 次名", "D組 次名"),
+        ("C組 首名", "待定 (小組第三)"), ("E組 首名", "H組 首名"),
+        ("F組 首名", "待定 (小組第三)"), ("G組 次名", "J組 次名"),
+        ("I組 首名", "待定 (小組第三)"), ("K組 首名", "L組 首名")
     ]
     for h, a in r32_teams:
         mock_matches.append({"stage": "LAST_32", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": h}, "awayTeam": {"name": a}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     for _ in range(8):
-        mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強 晉級隊"}, "awayTeam": {"name": "32強 晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+        mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強晉級隊"}, "awayTeam": {"name": "32強晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     for _ in range(4):
-        mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "16強 晉級隊"}, "awayTeam": {"name": "16強 晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+        mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "16強晉級隊"}, "awayTeam": {"name": "16強晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     for _ in range(2):
-        mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "8強 晉級隊"}, "awayTeam": {"name": "8強 晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+        mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "8強晉級隊"}, "awayTeam": {"name": "8強晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     
-    mock_matches.append({"stage": "FINAL", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽 勝者"}, "awayTeam": {"name": "準決賽 勝者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
-    mock_matches.append({"stage": "THIRD_PLACE", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽 敗者"}, "awayTeam": {"name": "準決賽 敗者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    mock_matches.append({"stage": "FINAL", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽勝者"}, "awayTeam": {"name": "準決賽勝者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    mock_matches.append({"stage": "THIRD_PLACE", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽敗者"}, "awayTeam": {"name": "準決賽敗者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     return mock_matches
 
 def get_match_card_html(match):
@@ -152,9 +158,14 @@ def get_match_card_html(match):
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "預定賽程"
     status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
 
+    is_confirmed = is_real_team(home_en) and is_real_team(away_en)
+    badge_html = " <span style='color: #43A047;'>✅已確認</span>" if is_confirmed and status_raw in ["TIMED", "SCHEDULED"] else ""
+    if not is_confirmed and status_raw in ["TIMED", "SCHEDULED"]:
+        badge_html = " <span style='color: #FB8C00;'>⏳對手待定</span>"
+
     html = (
         f'<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-width: 170px;">'
-        f'<div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 8px; font-weight: bold;">{dt_display} | {status_text}</div>'
+        f'<div style="font-size: 11px; color: {status_color}; text-align: center; margin-bottom: 8px; font-weight: bold;">{dt_display} | {status_text}{badge_html}</div>'
         f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">'
         f'<span style="font-size: 14px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">{home}{h_rank_str}</span>'
         f'<span style="font-size: 15px; font-weight: 900; color: #1E88E5;">{h_score}</span>'
@@ -189,11 +200,14 @@ def display_match_item(match):
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "預定"
     
+    is_confirmed = is_real_team(home_en) and is_real_team(away_en)
+    badge = " <span style='font-size: 14px; background-color: #E8F5E9; color: #2E7D32; padding: 2px 6px; border-radius: 4px; margin-left: 10px;'>✅ 最新確認組合</span>" if is_confirmed and status_raw in ["TIMED", "SCHEDULED"] else ""
+
     st.markdown("---")
-    st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
+    st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag}{badge} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
     
-    h_display = 0 if h_score is "-" else h_score
-    a_display = 0 if a_score is "-" else a_score
+    h_display = 0 if h_score == "-" else h_score
+    a_display = 0 if a_score == "-" else a_score
     c1, c2, c3 = st.columns(3)
     c1.metric(label=home, value=h_display)
     c2.metric(label="賽事狀態", value=status_text)
@@ -249,7 +263,7 @@ else:
     
     ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
     ko_matches = [m for m in all_m if m.get("stage") in ko_stages]
-    ko_has_teams = any((m.get("homeTeam", {}).get("name") not in [None, "TBD", "Unknown"]) for m in ko_matches)
+    ko_has_teams = any(is_real_team(m.get("homeTeam", {}).get("name")) for m in ko_matches)
     
     if not ko_has_teams:
         all_m = [m for m in all_m if m.get("stage") not in ko_stages]
@@ -287,7 +301,7 @@ with sub_tab1:
 
 with sub_tab2:
     st.subheader("🌳 淘汰賽晉級樹狀圖")
-    st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖")
+    st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖。只要分組賽一結束，晉級名單會 **自動取代** 預定位置！")
     tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
     tree_matches = [m for m in all_m if m.get("stage") in tree_stages]
     
