@@ -28,7 +28,7 @@ TEAM_TRANSLATION = {
     "Venezuela": "委內瑞拉", "Bolivia": "玻利維亞", "New Zealand": "紐西蘭",
     "Haiti": "海地", "Jamaica": "牙買加", "Honduras": "宏都拉斯", "El Salvador": "薩爾瓦多",
     "Panama": "巴拿馬", "Cuba": "古巴", "Trinidad and Tobago": "千里達及托巴哥",
-    "Curaçao": "古拉索", "Iraq": "伊拉克", "Syria": "敘 কুল", "United Arab Emirates": "阿聯酋",
+    "Curaçao": "古拉索", "Iraq": "伊拉克", "Syria": "敘利亞", "United Arab Emirates": "阿聯酋",
     "Uzbekistan": "烏茲別克", "China PR": "中國", "Oman": "阿曼", "Bahrain": "巴林",
     "Jordan": "約旦", "Lebanon": "黎巴嫩", "Vietnam": "越南", "Thailand": "泰國",
     "Indonesia": "印尼", "Malaysia": "馬來西亞", "India": "印度", "Türkiye": "土耳其",
@@ -68,12 +68,12 @@ STATUS_MAP = {
 
 def is_real_team(team_name):
     if not team_name: return False
-    fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "晉級", "首名", "次名", "勝者", "敗者", "UNKNOWN"]
+    fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "MATCH", "1ST", "2ND", "3RD", "晉級", "首名", "次名", "第三名", "勝者", "敗者", "UNKNOWN", "賽事"]
     name_upper = str(team_name).upper()
     return not any(kw in name_upper for kw in fake_keywords)
 
 # ==========================================
-# 2. 核心數據抓取與智慧預填 (包含積分即時連動)
+# 2. 核心數據抓取與智慧預填
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores():
@@ -111,80 +111,135 @@ def get_taipei_time(utc_date_str):
 def get_group_team(standings_data, group_letter, pos, fallback):
     if not standings_data: return fallback
     for g in standings_data:
-        if g.get("group") == f"GROUP_{group_letter}":
+        grp_raw = str(g.get("group", "")).upper().replace(" ", "_")
+        if grp_raw == f"GROUP_{group_letter}" or grp_raw == group_letter:
             table = g.get("table", [])
             if len(table) >= pos:
                 t_name = table[pos-1].get("team", {}).get("name", "")
-                if t_name: return t_name
+                max_played = max([t.get("playedGames", 0) for t in table] + [0])
+                if max_played >= 3 and t_name:
+                    return t_name
     return fallback
+
+def resolve_team_name(team_data, standings_data, default_mock):
+    if not team_data: return default_mock
+    name = team_data.get("name", "")
+    if not name: return default_mock
+    
+    name_up = name.upper()
+    if is_real_team(name):
+        return name
+        
+    if "GROUP" in name_up or "組" in name_up:
+        for letter in "ABCDEFGHIJKL":
+            if f"GROUP {letter}" in name_up or f"GROUP_{letter}" in name_up or f"{letter}組" in name_up:
+                pos = 1 if ("1ST" in name_up or "WINNER" in name_up or "首名" in name_up) else 2
+                if "2ND" in name_up or "次名" in name_up: pos = 2
+                if "3RD" in name_up or "第三" in name_up: pos = 3
+                
+                t_name = get_group_team(standings_data, letter, pos, "")
+                if t_name: return t_name
+    
+    if "TBD" in name_up or "UNKNOWN" in name_up or name_up.strip() == "WINNER" or name_up.strip() == "LOSER":
+        return default_mock
+        
+    trans = name
+    for letter in "ABCDEFGHIJKL":
+        trans = trans.replace(f"Group {letter}", f"{letter}組").replace(f"GROUP {letter}", f"{letter}組")
+        trans = trans.replace(f"Group_{letter}", f"{letter}組").replace(f"GROUP_{letter}", f"{letter}組")
+    trans = trans.replace("Winner", "勝者").replace("WINNER", "勝者")
+    trans = trans.replace("Loser", "敗者").replace("LOSER", "敗者")
+    trans = trans.replace("Match", "賽事").replace("MATCH", "賽事")
+    trans = trans.replace("1st", "首名").replace("1ST", "首名")
+    trans = trans.replace("2nd", "次名").replace("2ND", "次名")
+    trans = trans.replace("3rd", "第三名").replace("3RD", "第三名")
+    return trans
 
 def inject_live_knockout_teams(all_matches, standings_data):
     mock_r32 = [
-        (get_group_team(standings_data, 'A', 1, "A組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'B', 2, "B組 次名"), get_group_team(standings_data, 'C', 2, "C組 次名")),
-        (get_group_team(standings_data, 'D', 1, "D組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'E', 2, "E組 次名"), get_group_team(standings_data, 'F', 2, "F組 次名")),
-        (get_group_team(standings_data, 'G', 1, "G組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'H', 2, "H組 次名"), get_group_team(standings_data, 'I', 2, "I組 次名")),
-        (get_group_team(standings_data, 'J', 1, "J組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'K', 2, "K組 次名"), get_group_team(standings_data, 'L', 2, "L組 次名")),
-        (get_group_team(standings_data, 'B', 1, "B組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'A', 2, "A組 次名"), get_group_team(standings_data, 'D', 2, "D組 次名")),
-        (get_group_team(standings_data, 'C', 1, "C組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'E', 1, "E組 首名"), get_group_team(standings_data, 'H', 1, "H組 首名")),
-        (get_group_team(standings_data, 'F', 1, "F組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'G', 2, "G組 次名"), get_group_team(standings_data, 'J', 2, "J組 次名")),
-        (get_group_team(standings_data, 'I', 1, "I組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'K', 1, "K組 首名"), get_group_team(standings_data, 'L', 1, "L組 首名"))
+        ("A", 1, "A組 首名", "待定 (小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
+        ("D", 1, "D組 首名", "待定 (小組第三)"), ("E", 2, "E組 次名", "F", 2, "F組 次名"),
+        ("G", 1, "G組 首名", "待定 (小組第三)"), ("H", 2, "H組 次名", "I", 2, "I組 次名"),
+        ("J", 1, "J組 首名", "待定 (小組第三)"), ("K", 2, "K組 次名", "L", 2, "L組 次名"),
+        ("B", 1, "B組 首名", "待定 (小組第三)"), ("A", 2, "A組 次名", "D", 2, "D組 次名"),
+        ("C", 1, "C組 首名", "待定 (小組第三)"), ("E", 1, "E組 首名", "H", 1, "H組 首名"),
+        ("F", 1, "F組 首名", "待定 (小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
+        ("I", 1, "I組 首名", "待定 (小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
-    r32_count = 0
+    
+    l32_matches = [m for m in all_matches if m.get("stage") == "LAST_32"]
+    l32_matches.sort(key=lambda x: x.get("utcDate") or "")
+    
+    for i, m in enumerate(l32_matches):
+        h_team = m.get("homeTeam", {}) or {}
+        a_team = m.get("awayTeam", {}) or {}
+        
+        if i < 16:
+            cfg = mock_r32[i]
+            if len(cfg) == 4:
+                g_h, p_h, mock_h, mock_a = cfg
+                def_h = get_group_team(standings_data, g_h, p_h, mock_h)
+                def_a = mock_a
+            else:
+                g_h, p_h, mock_h, g_a, p_a, mock_a = cfg
+                def_h = get_group_team(standings_data, g_h, p_h, mock_h)
+                def_a = get_group_team(standings_data, g_a, p_a, mock_a)
+        else:
+            def_h, def_a = "待定", "待定"
+            
+        new_h = resolve_team_name(h_team, standings_data, def_h)
+        new_a = resolve_team_name(a_team, standings_data, def_a)
+        
+        if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
+        if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
+        m["homeTeam"]["name"] = new_h
+        m["awayTeam"]["name"] = new_a
+
+    fallback_map = {
+        "LAST_16": "32強晉級隊", "QUARTER_FINALS": "16強晉級隊", 
+        "SEMI_FINALS": "8強晉級隊", "FINAL": "準決賽勝者", "THIRD_PLACE": "準決賽敗者"
+    }
+    
     for m in all_matches:
         stage = m.get("stage")
-        if stage in ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]:
-            home_team = m.get("homeTeam", {}).get("name") if m.get("homeTeam") else None
-            away_team = m.get("awayTeam", {}).get("name") if m.get("awayTeam") else None
-            
-            if stage == "LAST_32":
-                mock_h, mock_a = mock_r32[r32_count % 16]
-                if not is_real_team(home_team):
-                    if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
-                    m["homeTeam"]["name"] = mock_h
-                if not is_real_team(away_team):
-                    if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
-                    m["awayTeam"]["name"] = mock_a
-                r32_count += 1
-            else:
-                fallback_map = {"LAST_16": "32強晉級隊", "QUARTER_FINALS": "16強晉級隊", "SEMI_FINALS": "8強晉級隊", "FINAL": "準決賽勝者", "THIRD_PLACE": "準決賽敗者"}
-                mock_val = fallback_map.get(stage, "待定")
-                if not is_real_team(home_team):
-                    if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
-                    m["homeTeam"]["name"] = mock_val
-                if not is_real_team(away_team):
-                    if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
-                    m["awayTeam"]["name"] = mock_val
+        if stage not in fallback_map: continue
+        
+        h_team = m.get("homeTeam", {}) or {}
+        a_team = m.get("awayTeam", {}) or {}
+        
+        def_val = fallback_map[stage]
+        new_h = resolve_team_name(h_team, standings_data, def_val)
+        new_a = resolve_team_name(a_team, standings_data, def_val)
+        
+        if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
+        if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
+        m["homeTeam"]["name"] = new_h
+        m["awayTeam"]["name"] = new_a
 
 def get_mock_knockout_matches(standings_data):
     mock_matches = []
     mock_r32 = [
-        (get_group_team(standings_data, 'A', 1, "A組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'B', 2, "B組 次名"), get_group_team(standings_data, 'C', 2, "C組 次名")),
-        (get_group_team(standings_data, 'D', 1, "D組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'E', 2, "E組 次名"), get_group_team(standings_data, 'F', 2, "F組 次名")),
-        (get_group_team(standings_data, 'G', 1, "G組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'H', 2, "H組 次名"), get_group_team(standings_data, 'I', 2, "I組 次名")),
-        (get_group_team(standings_data, 'J', 1, "J組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'K', 2, "K組 次名"), get_group_team(standings_data, 'L', 2, "L組 次名")),
-        (get_group_team(standings_data, 'B', 1, "B組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'A', 2, "A組 次名"), get_group_team(standings_data, 'D', 2, "D組 次名")),
-        (get_group_team(standings_data, 'C', 1, "C組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'E', 1, "E組 首名"), get_group_team(standings_data, 'H', 1, "H組 首名")),
-        (get_group_team(standings_data, 'F', 1, "F組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'G', 2, "G組 次名"), get_group_team(standings_data, 'J', 2, "J組 次名")),
-        (get_group_team(standings_data, 'I', 1, "I組 首名"), "待定 (小組第三)"), 
-        (get_group_team(standings_data, 'K', 1, "K組 首名"), get_group_team(standings_data, 'L', 1, "L組 首名"))
+        ("A", 1, "A組 首名", "待定 (小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
+        ("D", 1, "D組 首名", "待定 (小組第三)"), ("E", 2, "E組 次名", "F", 2, "F組 次名"),
+        ("G", 1, "G組 首名", "待定 (小組第三)"), ("H", 2, "H組 次名", "I", 2, "I組 次名"),
+        ("J", 1, "J組 首名", "待定 (小組第三)"), ("K", 2, "K組 次名", "L", 2, "L組 次名"),
+        ("B", 1, "B組 首名", "待定 (小組第三)"), ("A", 2, "A組 次名", "D", 2, "D組 次名"),
+        ("C", 1, "C組 首名", "待定 (小組第三)"), ("E", 1, "E組 首名", "H", 1, "H組 首名"),
+        ("F", 1, "F組 首名", "待定 (小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
+        ("I", 1, "I組 首名", "待定 (小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
-    for h, a in mock_r32:
+    for cfg in mock_r32:
+        if len(cfg) == 4:
+            g_h, p_h, mock_h, mock_a = cfg
+            h = get_group_team(standings_data, g_h, p_h, mock_h)
+            a = mock_a
+        else:
+            g_h, p_h, mock_h, g_a, p_a, mock_a = cfg
+            h = get_group_team(standings_data, g_h, p_h, mock_h)
+            a = get_group_team(standings_data, g_a, p_a, mock_a)
+            
         mock_matches.append({"stage": "LAST_32", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": h}, "awayTeam": {"name": a}, "score": {"fullTime": {"home": "-", "away": "-"}}})
+    
     for _ in range(8):
         mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強晉級隊"}, "awayTeam": {"name": "32強晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     for _ in range(4):
@@ -267,8 +322,9 @@ def display_match_item(match):
     st.markdown("---")
     st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag}{badge} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
     
-    h_display = 0 if h_score == "-" else h_score
-    a_display = 0 if a_score == "-" else a_score
+    h_display = "-" if h_score in [None, ""] else h_score
+    a_display = "-" if a_score in [None, ""] else a_score
+    
     c1, c2, c3 = st.columns(3)
     c1.metric(label=home, value=h_display)
     c2.metric(label="賽事狀態", value=status_text)
