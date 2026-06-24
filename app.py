@@ -72,7 +72,7 @@ GROUP_MAP = {
     "GROUP_I": "I組", "GROUP_J": "J組", "GROUP_K": "K組", "GROUP_L": "L組"
 }
 
-# 判斷是否為真實的已確認國家隊伍
+# 判斷是否為真實的國家隊伍（避開官方的 TBD、Winner 等暫定詞彙）
 def is_real_team(team_name):
     if not team_name: return False
     fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "晉級", "首名", "次名", "勝者", "敗者", "UNKNOWN"]
@@ -80,7 +80,7 @@ def is_real_team(team_name):
     return not any(kw in name_upper for kw in fake_keywords)
 
 # ==========================================
-# 2. 自動連網抓取與智慧預填機制
+# 2. 自動連網抓取與智慧預填機制 (核心更新區)
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_all_matches():
@@ -91,8 +91,7 @@ def fetch_all_matches():
         response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
             return {"data": response.json().get("matches", [])}
-        else:
-            return {"error": f"國際伺服器賽程回應錯誤 (代碼 {response.status_code})"}
+        return {"error": f"國際伺服器賽程回應錯誤 (代碼 {response.status_code})"}
     except Exception as e:
         return {"error": f"系統連線異常：{e}"}
 
@@ -105,8 +104,7 @@ def fetch_standings():
         response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
             return {"data": response.json().get("standings", [])}
-        else:
-            return {"error": f"國際伺服器積分回應錯誤 (代碼 {response.status_code})"}
+        return {"error": f"國際伺服器積分回應錯誤 (代碼 {response.status_code})"}
     except Exception as e:
         return {"error": f"積分連線異常：{e}"}
 
@@ -117,20 +115,86 @@ def get_taipei_time(utc_date_str):
     except:
         return None
 
-def get_mock_knockout_matches():
-    """當官方 API 淘汰賽國家全數未定時，自動注入預定賽制表"""
-    mock_matches = []
-    r32_teams = [
-        ("A組 首名", "待定 (小組第三)"), ("B組 次名", "C組 次名"),
-        ("D組 首名", "待定 (小組第三)"), ("E組 次名", "F組 次名"),
-        ("G組 首名", "待定 (小組第三)"), ("H組 次名", "I組 次名"),
-        ("J組 首名", "待定 (小組第三)"), ("K組 次名", "L組 次名"),
-        ("B組 首名", "待定 (小組第三)"), ("A組 次名", "D組 次名"),
-        ("C組 首名", "待定 (小組第三)"), ("E組 首名", "H組 首名"),
-        ("F組 首名", "待定 (小組第三)"), ("G組 次名", "J組 次名"),
-        ("I組 首名", "待定 (小組第三)"), ("K組 首名", "L組 首名")
+# ✨ 即時從「積分榜」抓取當前小組第一、第二名，達成 B組完賽立刻連動
+def get_group_team(standings_data, group_letter, pos, fallback):
+    if not standings_data: return fallback
+    for g in standings_data:
+        if g.get("group") == f"GROUP_{group_letter}":
+            table = g.get("table", [])
+            if len(table) >= pos:
+                t_name = table[pos-1].get("team", {}).get("name", "")
+                if t_name: return t_name # 回傳英文原名，後續流程會自動翻譯與掛上排名
+    return fallback
+
+# ✨ 保留 API 的時間與數據，只將「TBD」置換為我們的智慧名單
+def inject_live_knockout_teams(all_matches, standings_data):
+    mock_r32 = [
+        (get_group_team(standings_data, 'A', 1, "A組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'B', 2, "B組 次名"), get_group_team(standings_data, 'C', 2, "C組 次名")),
+        (get_group_team(standings_data, 'D', 1, "D組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'E', 2, "E組 次名"), get_group_team(standings_data, 'F', 2, "F組 次名")),
+        (get_group_team(standings_data, 'G', 1, "G組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'H', 2, "H組 次名"), get_group_team(standings_data, 'I', 2, "I組 次名")),
+        (get_group_team(standings_data, 'J', 1, "J組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'K', 2, "K組 次名"), get_group_team(standings_data, 'L', 2, "L組 次名")),
+        (get_group_team(standings_data, 'B', 1, "B組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'A', 2, "A組 次名"), get_group_team(standings_data, 'D', 2, "D組 次名")),
+        (get_group_team(standings_data, 'C', 1, "C組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'E', 1, "E組 首名"), get_group_team(standings_data, 'H', 1, "H組 首名")),
+        (get_group_team(standings_data, 'F', 1, "F組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'G', 2, "G組 次名"), get_group_team(standings_data, 'J', 2, "J組 次名")),
+        (get_group_team(standings_data, 'I', 1, "I組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'K', 1, "K組 首名"), get_group_team(standings_data, 'L', 1, "L組 首名"))
     ]
-    for h, a in r32_teams:
+    r32_count = 0
+    for m in all_matches:
+        stage = m.get("stage")
+        if stage in ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]:
+            home_team = m.get("homeTeam", {}).get("name") if m.get("homeTeam") else None
+            away_team = m.get("awayTeam", {}).get("name") if m.get("awayTeam") else None
+            
+            if stage == "LAST_32":
+                mock_h, mock_a = mock_r32[r32_count % 16]
+                if not is_real_team(home_team):
+                    if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
+                    m["homeTeam"]["name"] = mock_h
+                if not is_real_team(away_team):
+                    if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
+                    m["awayTeam"]["name"] = mock_a
+                r32_count += 1
+            else:
+                fallback_map = {"LAST_16": "32強晉級隊", "QUARTER_FINALS": "16強晉級隊", "SEMI_FINALS": "8強晉級隊", "FINAL": "準決賽勝者", "THIRD_PLACE": "準決賽敗者"}
+                mock_val = fallback_map.get(stage, "待定")
+                if not is_real_team(home_team):
+                    if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
+                    m["homeTeam"]["name"] = mock_val
+                if not is_real_team(away_team):
+                    if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
+                    m["awayTeam"]["name"] = mock_val
+
+def get_mock_knockout_matches(standings_data):
+    mock_matches = []
+    # 如果 API 完全空白，才執行全新建構（這通常只在開賽前發生）
+    # 這裡的邏輯與上方完全一致，確保 fallback 有效
+    mock_r32 = [
+        (get_group_team(standings_data, 'A', 1, "A組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'B', 2, "B組 次名"), get_group_team(standings_data, 'C', 2, "C組 次名")),
+        (get_group_team(standings_data, 'D', 1, "D組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'E', 2, "E組 次名"), get_group_team(standings_data, 'F', 2, "F組 次名")),
+        (get_group_team(standings_data, 'G', 1, "G組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'H', 2, "H組 次名"), get_group_team(standings_data, 'I', 2, "I組 次名")),
+        (get_group_team(standings_data, 'J', 1, "J組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'K', 2, "K組 次名"), get_group_team(standings_data, 'L', 2, "L組 次名")),
+        (get_group_team(standings_data, 'B', 1, "B組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'A', 2, "A組 次名"), get_group_team(standings_data, 'D', 2, "D組 次名")),
+        (get_group_team(standings_data, 'C', 1, "C組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'E', 1, "E組 首名"), get_group_team(standings_data, 'H', 1, "H組 首名")),
+        (get_group_team(standings_data, 'F', 1, "F組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'G', 2, "G組 次名"), get_group_team(standings_data, 'J', 2, "J組 次名")),
+        (get_group_team(standings_data, 'I', 1, "I組 首名"), "待定 (小組第三)"), 
+        (get_group_team(standings_data, 'K', 1, "K組 首名"), get_group_team(standings_data, 'L', 1, "L組 首名"))
+    ]
+    for h, a in mock_r32:
         mock_matches.append({"stage": "LAST_32", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": h}, "awayTeam": {"name": a}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     for _ in range(8):
         mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強晉級隊"}, "awayTeam": {"name": "32強晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
@@ -138,7 +202,6 @@ def get_mock_knockout_matches():
         mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "16強晉級隊"}, "awayTeam": {"name": "16強晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     for _ in range(2):
         mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "8強晉級隊"}, "awayTeam": {"name": "8強晉級隊"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
-    
     mock_matches.append({"stage": "FINAL", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽勝者"}, "awayTeam": {"name": "準決賽勝者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     mock_matches.append({"stage": "THIRD_PLACE", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽敗者"}, "awayTeam": {"name": "準決賽敗者"}, "score": {"fullTime": {"home": "-", "away": "-"}}})
     return mock_matches
@@ -166,10 +229,10 @@ def get_match_card_html(match):
     status_text = STATUS_MAP.get(status_raw, status_raw)
     
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
-    dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "預定賽程"
+    # ✨ 修正：如果沒有時間，顯示「時間待定」，若有時間則完美顯示
+    dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
     status_color = "#E53935" if status_raw in ["IN_PLAY", "PAUSED"] else "#757575"
 
-    # ✨ 智慧偵測：雙方是否已經出線確認？
     is_confirmed = is_real_team(home_en) and is_real_team(away_en)
     badge_html = " <span style='color: #43A047;'>✅已確認</span>" if is_confirmed and status_raw in ["TIMED", "SCHEDULED"] else ""
     if not is_confirmed and status_raw in ["TIMED", "SCHEDULED"]:
@@ -209,16 +272,16 @@ def display_match_item(match, display_date=True):
     status_text = STATUS_MAP.get(status_raw, status_raw)
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     
-    # ✨ 智慧偵測列表標籤
     is_confirmed = is_real_team(home_en) and is_real_team(away_en)
     badge = " <span style='font-size: 14px; background-color: #E8F5E9; color: #2E7D32; padding: 2px 6px; border-radius: 4px; margin-left: 10px;'>✅ 最新確認組合</span>" if is_confirmed and status_raw in ["TIMED", "SCHEDULED"] else ""
     
     st.markdown("---")
+    # ✨ 修正：確保如果有 utcDate，列表模式也能印出準確時間
     if display_date:
-        dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "等待官方排定時間"
+        dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
         st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag}{badge} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({dt_display})</span>", unsafe_allow_html=True)
     else:
-        time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "預定"
+        time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定"
         st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag}{badge} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
 
     h_display = 0 if h_score == "-" else h_score
@@ -276,17 +339,16 @@ if "error" in matches_result:
     st.error(f"❌ 賽程載入失敗：{matches_result['error']}")
 else:
     all_matches = matches_result.get("data", [])
+    standings_data = standings_result.get("data", []) if "error" not in standings_result else []
     
     ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
     ko_matches = [m for m in all_matches if m.get("stage") in ko_stages]
     
-    # 判斷 API 是否已經釋出真實的晉級國家名單
-    ko_has_teams = any(is_real_team(m.get("homeTeam", {}).get("name")) for m in ko_matches)
-    
-    # 如果 API 還全是「待定」，就填入我們準備的 32 強預定架構；若已有隊伍晉級，就會無縫替換成真實國家！
-    if not ko_has_teams:
-        all_matches = [m for m in all_matches if m.get("stage") not in ko_stages]
-        all_matches.extend(get_mock_knockout_matches())
+    # ✨ 核心修正：不再直接抹除 API 資料，而是去填補 API 裡空缺的 TBD
+    if not ko_matches:
+        all_matches.extend(get_mock_knockout_matches(standings_data))
+    else:
+        inject_live_knockout_teams(all_matches, standings_data)
         
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 淘汰賽列表", "🌳 晉級樹狀圖", "⚽ 分組賽進度", "📊 各組積分表", "📡 今日與次日焦點"])
     
@@ -302,7 +364,7 @@ else:
 
     with tab2:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (Bracket)")
-        st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖。只要分組賽一結束，晉級名單會 **自動取代** 預定位置！")
+        st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖。只要分組賽一結束，晉級名單會 **自動連動取代** 預定位置！")
         tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
         tree_matches = [m for m in all_matches if m.get("stage") in tree_stages]
         
@@ -343,11 +405,11 @@ else:
         if "error" in standings_result:
             st.error(f"❌ 積分表同步失敗：{standings_result['error']}")
         else:
-            standings_data = standings_result.get("data", [])
-            if not standings_data:
+            standings_data_table = standings_result.get("data", [])
+            if not standings_data_table:
                 st.info("⚽ 官方尚未上傳分組積分表數據。")
             else:
-                for group_data in standings_data:
+                for group_data in standings_data_table:
                     g_code = group_data.get("group")
                     g_name = GROUP_MAP.get(g_code, g_code)
                     
