@@ -73,7 +73,7 @@ GROUP_MAP = {
 }
 
 # ==========================================
-# 2. 自動連網抓取與智慧預填機制 (核心更新區)
+# 2. 自動連網抓取與智慧預填機制 (核心區)
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_all_matches():
@@ -109,13 +109,14 @@ def get_taipei_time(utc_date_str):
         return None
 
 def is_real_team(team_name):
+    """判斷該字串是否為真實國家，避開 API 的佔位符"""
     if not team_name: return False
     fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "MATCH", "1ST", "2ND", "3RD", "晉級", "首名", "次名", "第三名", "勝者", "敗者", "UNKNOWN", "賽事"]
     name_upper = str(team_name).upper()
     return not any(kw in name_upper for kw in fake_keywords)
 
 def get_group_team(standings_data, group_letter, pos, fallback):
-    """取得積分榜名次。只有在該小組已踢滿 3 場 (確定名單) 時才回傳實體國家，否則維持預定組合"""
+    """【強效對接版】：只要該小組積分榜上有排名對應的國家，立即回傳更新"""
     if not standings_data: return fallback
     for g in standings_data:
         grp_raw = str(g.get("group", "")).upper().replace(" ", "_")
@@ -123,127 +124,60 @@ def get_group_team(standings_data, group_letter, pos, fallback):
             table = g.get("table", [])
             if len(table) >= pos:
                 t_name = table[pos-1].get("team", {}).get("name", "")
-                # 檢查小組進度：如果該小組有隊伍踢滿3場，才視為「已確定」並更新
-                max_played = max([t.get("playedGames", 0) for t in table] + [0])
-                if max_played >= 3 and t_name:
-                    return t_name
+                if t_name: return t_name
     return fallback
 
-def resolve_team_name(team_data, standings_data, default_mock):
-    """智慧解析 API 佔位符，並將其與積分榜配對，或優雅翻譯保留"""
-    if not team_data: return default_mock
-    name = team_data.get("name", "")
-    if not name: return default_mock
-    
-    name_up = name.upper()
-    if is_real_team(name):
-        return name
-        
-    # 如果 API 提供了小組預定順位 (如 "Winner Group B" 或 "2nd Group C")，則去追蹤該小組積分
-    if "GROUP" in name_up or "組" in name_up:
-        for letter in "ABCDEFGHIJKL":
-            if f"GROUP {letter}" in name_up or f"GROUP_{letter}" in name_up or f"{letter}組" in name_up:
-                pos = 1 if ("1ST" in name_up or "WINNER" in name_up or "首名" in name_up) else 2
-                if "2ND" in name_up or "次名" in name_up: pos = 2
-                if "3RD" in name_up or "第三" in name_up: pos = 3
-                
-                t_name = get_group_team(standings_data, letter, pos, "")
-                if t_name: return t_name # 只有在小組確定完賽時，才會回傳實體國家
-    
-    # 若 API 只給純 TBD，則套用我們設計好的 32 強賽制結構
-    if "TBD" in name_up or "UNKNOWN" in name_up or name_up.strip() == "WINNER" or name_up.strip() == "LOSER":
-        return default_mock
-        
-    # 若該組尚未完賽，則完美翻譯 API 的預定名稱 (例如 Winner Group B -> 勝者 B組)
-    trans = name
-    for letter in "ABCDEFGHIJKL":
-        trans = trans.replace(f"Group {letter}", f"{letter}組").replace(f"GROUP {letter}", f"{letter}組")
-        trans = trans.replace(f"Group_{letter}", f"{letter}組").replace(f"GROUP_{letter}", f"{letter}組")
-    trans = trans.replace("Winner", "勝者").replace("WINNER", "勝者")
-    trans = trans.replace("Loser", "敗者").replace("LOSER", "敗者")
-    trans = trans.replace("Match", "賽事").replace("MATCH", "賽事")
-    trans = trans.replace("1st", "首名").replace("1ST", "首名")
-    trans = trans.replace("2nd", "次名").replace("2ND", "次名")
-    trans = trans.replace("3rd", "第三名").replace("3RD", "第三名")
-    return trans
-
 def inject_live_knockout_teams(all_matches, standings_data):
-    """智慧更新所有的淘汰賽名稱，保留原先的時間與賽程組合"""
+    """
+    【強迫覆寫】：針對已經由 API 提供但名字還是「空值/Winner」的淘汰賽，
+    強制用目前的積分排名去取代它。
+    """
     mock_r32 = [
-        ("A", 1, "A組 首名", "待定 (小組第三)"),
-        ("B", 2, "B組 次名", "C", 2, "C組 次名"),
-        ("D", 1, "D組 首名", "待定 (小組第三)"),
-        ("E", 2, "E組 次名", "F", 2, "F組 次名"),
-        ("G", 1, "G組 首名", "待定 (小組第三)"),
-        ("H", 2, "H組 次名", "I", 2, "I組 次名"),
-        ("J", 1, "J組 首名", "待定 (小組第三)"),
-        ("K", 2, "K組 次名", "L", 2, "L組 次名"),
-        ("B", 1, "B組 首名", "待定 (小組第三)"),
-        ("A", 2, "A組 次名", "D", 2, "D組 次名"),
-        ("C", 1, "C組 首名", "待定 (小組第三)"),
-        ("E", 1, "E組 首名", "H", 1, "H組 首名"),
-        ("F", 1, "F組 首名", "待定 (小組第三)"),
-        ("G", 2, "G組 次名", "J", 2, "J組 次名"),
-        ("I", 1, "I組 首名", "待定 (小組第三)"),
-        ("K", 1, "K組 首名", "L", 1, "L組 首名")
+        ("A", 1, "A組 首名", "待定 (小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
+        ("D", 1, "D組 首名", "待定 (小組第三)"), ("E", 2, "E組 次名", "F", 2, "F組 次名"),
+        ("G", 1, "G組 首名", "待定 (小組第三)"), ("H", 2, "H組 次名", "I", 2, "I組 次名"),
+        ("J", 1, "J組 首名", "待定 (小組第三)"), ("K", 2, "K組 次名", "L", 2, "L組 次名"),
+        ("B", 1, "B組 首名", "待定 (小組第三)"), ("A", 2, "A組 次名", "D", 2, "D組 次名"),
+        ("C", 1, "C組 首名", "待定 (小組第三)"), ("E", 1, "E組 首名", "H", 1, "H組 首名"),
+        ("F", 1, "F組 首名", "待定 (小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
+        ("I", 1, "I組 首名", "待定 (小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
     
-    # 抽取 LAST_32 賽事並照日期排序，以對應預設模版 (若 API 有傳回的話)
     l32_matches = [m for m in all_matches if m.get("stage") == "LAST_32"]
     l32_matches.sort(key=lambda x: x.get("utcDate") or "")
     
     for i, m in enumerate(l32_matches):
-        h_team = m.get("homeTeam", {}) or {}
-        a_team = m.get("awayTeam", {}) or {}
-        
-        if i < 16:
+        if i < len(mock_r32):
             cfg = mock_r32[i]
             if len(cfg) == 4:
-                g_h, p_h, mock_h, mock_a = cfg
-                def_h = get_group_team(standings_data, g_h, p_h, mock_h)
-                def_a = mock_a
+                g_h, p_h, m_h, m_a = cfg
+                real_h = get_group_team(standings_data, g_h, p_h, m_h)
+                real_a = m_a
             else:
-                g_h, p_h, mock_h, g_a, p_a, mock_a = cfg
-                def_h = get_group_team(standings_data, g_h, p_h, mock_h)
-                def_a = get_group_team(standings_data, g_a, p_a, mock_a)
-        else:
-            def_h, def_a = "待定", "待定"
+                g_h, p_h, m_h, g_a, p_a, m_a = cfg
+                real_h = get_group_team(standings_data, g_h, p_h, m_h)
+                real_a = get_group_team(standings_data, g_a, p_a, m_a)
             
-        new_h = resolve_team_name(h_team, standings_data, def_h)
-        new_a = resolve_team_name(a_team, standings_data, def_a)
-        
-        if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
-        if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
-        m["homeTeam"]["name"] = new_h
-        m["awayTeam"]["name"] = new_a
+            if "homeTeam" not in m or m["homeTeam"] is None or not is_real_team(m.get("homeTeam", {}).get("name")):
+                m["homeTeam"] = {"name": real_h}
+            if "awayTeam" not in m or m["awayTeam"] is None or not is_real_team(m.get("awayTeam", {}).get("name")):
+                m["awayTeam"] = {"name": real_a}
 
-    # 其餘淘汰賽段
     fallback_map = {
-        "LAST_16": "32強晉級隊", 
-        "QUARTER_FINALS": "16強晉級隊", 
-        "SEMI_FINALS": "8強晉級隊", 
-        "FINAL": "準決賽勝者", 
-        "THIRD_PLACE": "準決賽敗者"
+        "LAST_16": "32強晉級隊", "QUARTER_FINALS": "16強晉級隊", 
+        "SEMI_FINALS": "8強晉級隊", "FINAL": "準決賽勝者", "THIRD_PLACE": "準決賽敗者"
     }
-    
     for m in all_matches:
         stage = m.get("stage")
-        if stage not in fallback_map: continue
-        
-        h_team = m.get("homeTeam", {}) or {}
-        a_team = m.get("awayTeam", {}) or {}
-        
-        def_val = fallback_map[stage]
-        new_h = resolve_team_name(h_team, standings_data, def_val)
-        new_a = resolve_team_name(a_team, standings_data, def_val)
-        
-        if "homeTeam" not in m or m["homeTeam"] is None: m["homeTeam"] = {}
-        if "awayTeam" not in m or m["awayTeam"] is None: m["awayTeam"] = {}
-        m["homeTeam"]["name"] = new_h
-        m["awayTeam"]["name"] = new_a
+        if stage in fallback_map:
+            def_val = fallback_map[stage]
+            if "homeTeam" not in m or m["homeTeam"] is None or not is_real_team(m.get("homeTeam", {}).get("name")):
+                m["homeTeam"] = {"name": def_val}
+            if "awayTeam" not in m or m["awayTeam"] is None or not is_real_team(m.get("awayTeam", {}).get("name")):
+                m["awayTeam"] = {"name": def_val}
 
 def get_mock_knockout_matches(standings_data):
-    """當 API 完全空白未釋出淘汰賽時的完美防護"""
+    """【API 全空白自研產生器】"""
     mock_matches = []
     mock_r32 = [
         ("A", 1, "A組 首名", "待定 (小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
@@ -354,7 +288,6 @@ def display_match_item(match, display_date=True):
         time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定"
         st.markdown(f"### 🏟️ {home}{h_rank_tag} 🆚 {away}{a_rank_tag}{badge} <span style='font-size: 14px; color: gray; margin-left: 10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
 
-    # 確保未開踢的賽事會顯示 "-" 而不是 0
     h_display = "-" if h_score in [None, ""] else h_score
     a_display = "-" if a_score in [None, ""] else a_score
     
@@ -399,7 +332,7 @@ def display_match_item(match, display_date=True):
 st.set_page_config(page_title="2026世足動態全功能看板", page_icon="🏆", layout="wide")
 
 st.title("🏆 2026 世足賽動態看板")
-st.markdown("美加墨聯合主辦｜賽程・即時比分・分組積分・晉級樹狀圖全自動同步")
+st.markdown("美加墨聯合主辦｜賽程・即時比分・分組積分統計・晉級樹狀圖全自動同步")
 
 if st.button("🔄 立即刷新、同步最新數據", use_container_width=True):
     st.cache_data.clear()
@@ -416,13 +349,13 @@ else:
     ko_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"]
     ko_matches = [m for m in all_matches if m.get("stage") in ko_stages]
     
-    # 無論 API 有沒有釋出淘汰賽階段，我們都進行智慧名稱解析與填補
+    # 執行無縫對接，強制替換名單
     if not ko_matches:
         all_matches.extend(get_mock_knockout_matches(standings_data))
     else:
         inject_live_knockout_teams(all_matches, standings_data)
         
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 淘汰賽列表", "🌳 晉級樹狀圖", "⚽ 分組賽進度", "📊 各組積分表", "📡 今日與次日焦點"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 淘汰賽列表", "🌳 晉級樹狀圖", "⚽ 分組賽進度", "📊 各組積分與數據", "📡 今日與次日焦點"])
     
     with tab1:
         st.subheader("世界盃淘汰賽最新戰況 (列表模式)")
@@ -436,7 +369,7 @@ else:
 
     with tab2:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (Bracket)")
-        st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖。只要分組賽一結束，晉級名單會 **自動連動取代** 預定位置！")
+        st.caption("💡 提示：在手機上可 **左右滑動** 檢視完整樹狀圖。只要積分榜一變動，晉級名單會 **即時連動取代** 預定位置！")
         tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
         tree_matches = [m for m in all_matches if m.get("stage") in tree_stages]
         
@@ -473,7 +406,7 @@ else:
                         display_match_item(m, display_date=True)
 
     with tab4:
-        st.subheader("2026 世界盃小組積分榜")
+        st.subheader("2026 世界盃各小組詳細積分統計")
         if "error" in standings_result:
             st.error(f"❌ 積分表同步失敗：{standings_result['error']}")
         else:
@@ -492,14 +425,18 @@ else:
                         team_zh = TEAM_TRANSLATION.get(team_en.strip(), team_en)
                         team_rank = TEAM_RANKING.get(team_en.strip(), "-")
                         
+                        # ✨ 核心擴充：加入進球、失球、淨勝球等完整數據
                         table_rows.append({
                             "排名": entry.get("position"), 
                             "球隊": team_zh, 
                             "世界排名": team_rank,
                             "已賽": entry.get("playedGames"),
-                            "勝": entry.get("won"), "和": entry.get("draw"), "敗": entry.get("lost"),
-                            "進/失球": f"{entry.get('goalsFor')}/{entry.get('goalsAgainst')}",
-                            "得失差": entry.get("goalDifference"), "積分": entry.get("points")
+                            "勝": entry.get("won"), 
+                            "和": entry.get("draw"), 
+                            "敗": entry.get("lost"),
+                            "進/失球": f"{entry.get('goalsFor')} / {entry.get('goalsAgainst')}",
+                            "淨勝球(GD)": entry.get("goalDifference"), 
+                            "總積分": entry.get("points")
                         })
                     st.dataframe(table_rows, use_container_width=True, hide_index=True)
 
