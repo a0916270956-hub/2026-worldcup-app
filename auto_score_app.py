@@ -102,6 +102,25 @@ def get_group_team(standings_data, group_letter, pos, fallback):
                 if t_name: return t_name
     return fallback
 
+def get_mock_date(stage, index):
+    """根據 2026 世足賽真實預估賽程，回傳預設開踢時間 (UTC)"""
+    base_dates = {
+        "LAST_32": datetime(2026, 6, 28, 12, 0, 0),
+        "LAST_16": datetime(2026, 7, 4, 12, 0, 0),
+        "QUARTER_FINALS": datetime(2026, 7, 9, 12, 0, 0),
+        "SEMI_FINALS": datetime(2026, 7, 14, 16, 0, 0),
+        "THIRD_PLACE": datetime(2026, 7, 18, 16, 0, 0),
+        "FINAL": datetime(2026, 7, 19, 16, 0, 0)
+    }
+    base = base_dates.get(stage, datetime(2026, 6, 28, 0, 0, 0))
+    if stage in ["LAST_32", "LAST_16", "QUARTER_FINALS"]:
+        offset = timedelta(days=index // 2, hours=(index % 2) * 4)
+    elif stage == "SEMI_FINALS":
+        offset = timedelta(days=index, hours=0)
+    else:
+        offset = timedelta(0)
+    return (base + offset).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 def inject_live_knockout_teams(all_matches, standings_data):
     mock_r32 = [
         ("A", 1, "A組 首名", "待定(小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
@@ -158,7 +177,7 @@ def get_mock_knockout_matches(standings_data):
         ("F", 1, "F組 首名", "待定(小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
         ("I", 1, "I組 首名", "待定(小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
-    for cfg in mock_r32:
+    for i, cfg in enumerate(mock_r32):
         if len(cfg) == 4:
             g_h, p_h, mock_h, mock_a = cfg
             h = get_group_team(standings_data, g_h, p_h, mock_h)
@@ -167,20 +186,27 @@ def get_mock_knockout_matches(standings_data):
             g_h, p_h, mock_h, g_a, p_a, mock_a = cfg
             h = get_group_team(standings_data, g_h, p_h, mock_h)
             a = get_group_team(standings_data, g_a, p_a, mock_a)
-        mock_matches.append({"stage": "LAST_32", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": h}, "awayTeam": {"name": a}, "score": {"fullTime": {"home": None, "away": None}}})
+        mock_matches.append({"stage": "LAST_32", "status": "SCHEDULED", "utcDate": get_mock_date("LAST_32", i), "homeTeam": {"name": h}, "awayTeam": {"name": a}, "score": {"fullTime": {"home": None, "away": None}}})
     
-    for _ in range(8): mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強勝者"}, "awayTeam": {"name": "32強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
-    for _ in range(4): mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "16強勝者"}, "awayTeam": {"name": "16強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
-    for _ in range(2): mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "8強勝者"}, "awayTeam": {"name": "8強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
-    mock_matches.append({"stage": "FINAL", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽勝者"}, "awayTeam": {"name": "準決賽勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
-    mock_matches.append({"stage": "THIRD_PLACE", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽敗者"}, "awayTeam": {"name": "準決賽敗者"}, "score": {"fullTime": {"home": None, "away": None}}})
+    for i in range(8): mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": get_mock_date("LAST_16", i), "homeTeam": {"name": "32強勝者"}, "awayTeam": {"name": "32強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
+    for i in range(4): mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": get_mock_date("QUARTER_FINALS", i), "homeTeam": {"name": "16強勝者"}, "awayTeam": {"name": "16強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
+    for i in range(2): mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": get_mock_date("SEMI_FINALS", i), "homeTeam": {"name": "8強勝者"}, "awayTeam": {"name": "8強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
+    mock_matches.append({"stage": "FINAL", "status": "SCHEDULED", "utcDate": get_mock_date("FINAL", 0), "homeTeam": {"name": "準決賽勝者"}, "awayTeam": {"name": "準決賽勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
+    mock_matches.append({"stage": "THIRD_PLACE", "status": "SCHEDULED", "utcDate": get_mock_date("THIRD_PLACE", 0), "homeTeam": {"name": "準決賽敗者"}, "awayTeam": {"name": "準決賽敗者"}, "score": {"fullTime": {"home": None, "away": None}}})
     return mock_matches
 
 def get_padded_matches(matches, stage, expected_count):
     stage_matches = [m for m in matches if m.get("stage") == stage]
     stage_matches.sort(key=lambda x: x.get("utcDate") or "")
     while len(stage_matches) < expected_count:
-        stage_matches.append({"homeTeam": {"name": "待定"}, "awayTeam": {"name": "待定"}})
+        idx = len(stage_matches)
+        stage_matches.append({
+            "stage": stage,
+            "status": "SCHEDULED",
+            "utcDate": get_mock_date(stage, idx),
+            "homeTeam": {"name": "待定"}, 
+            "awayTeam": {"name": "待定"}
+        })
     return stage_matches[:expected_count]
 
 # ==========================================
@@ -210,7 +236,6 @@ def get_match_card_html(match):
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
-    if "待定" in home or "勝者" in home or "敗者" in home: dt_display = "對手確認中"
 
     html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:8px 12px;width:170px;height:76px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:11px;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:4px;margin-bottom:2px;">{dt_display}</div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">{home}</span><span style="font-size:13px;font-weight:bold;color:#202124;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">{away}</span><span style="font-size:13px;font-weight:bold;color:#202124;">{a_score}</span></div></div>'
     return html
@@ -273,6 +298,13 @@ if "error" not in match_res:
         all_m.extend(get_mock_knockout_matches(standings_data))
     else:
         inject_live_knockout_teams(all_m, standings_data)
+        
+    for stage_code in ko_stages:
+        s_matches = [m for m in all_m if m.get("stage") == stage_code]
+        s_matches.sort(key=lambda x: x.get("utcDate") or "")
+        for i, m in enumerate(s_matches):
+            if not m.get("utcDate"):
+                m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
     st.subheader("🌳 淘汰賽晉級樹狀圖 (完美 SVG 無縫版)")
