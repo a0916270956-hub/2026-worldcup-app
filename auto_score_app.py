@@ -28,7 +28,7 @@ TEAM_TRANSLATION = {
     "Venezuela": "委內瑞拉", "Bolivia": "玻利維亞", "New Zealand": "紐西蘭",
     "Haiti": "海地", "Jamaica": "牙買加", "Honduras": "宏都拉斯", "El Salvador": "薩爾瓦多",
     "Panama": "巴拿馬", "Cuba": "古巴", "Trinidad and Tobago": "千里達及托巴哥",
-    "Curaçao": "古拉索", "Iraq": "伊拉克", "Syria": "敘利亞", "United Arab Emirates": "阿聯酋",
+    "Curaçao": "古拉索", "Iraq": "伊拉克", "Syria": "敘ষ্ঠ利亞", "United Arab Emirates": "阿聯酋",
     "Uzbekistan": "烏茲別克", "China PR": "中國", "Oman": "阿曼", "Bahrain": "巴林",
     "Jordan": "約旦", "Lebanon": "黎巴嫩", "Vietnam": "越南", "Thailand": "泰國",
     "Indonesia": "印尼", "Malaysia": "馬來西亞", "India": "印度", "Türkiye": "土耳其",
@@ -104,14 +104,14 @@ def get_group_team(standings_data, group_letter, pos, fallback):
 
 def inject_live_knockout_teams(all_matches, standings_data):
     mock_r32 = [
-        ("A", 1, "A組 首名", "待定 (小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
-        ("D", 1, "D組 首名", "待定 (小組第三)"), ("E", 2, "E組 次名", "F", 2, "F組 次名"),
-        ("G", 1, "G組 首名", "待定 (小組第三)"), ("H", 2, "H組 次名", "I", 2, "I組 次名"),
-        ("J", 1, "J組 首名", "待定 (小組第三)"), ("K", 2, "K組 次名", "L", 2, "L組 次名"),
-        ("B", 1, "B組 首名", "待定 (小組第三)"), ("A", 2, "A組 次名", "D", 2, "D組 次名"),
-        ("C", 1, "C組 首名", "待定 (小組第三)"), ("E", 1, "E組 首名", "H", 1, "H組 首名"),
-        ("F", 1, "F組 首名", "待定 (小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
-        ("I", 1, "I組 首名", "待定 (小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
+        ("A", 1, "A組 首名", "待定(小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
+        ("D", 1, "D組 首名", "待定(小組第三)"), ("E", 2, "E組 次名", "F", 2, "F組 次名"),
+        ("G", 1, "G組 首名", "待定(小組第三)"), ("H", 2, "H組 次名", "I", 2, "I組 次名"),
+        ("J", 1, "J組 首名", "待定(小組第三)"), ("K", 2, "K組 次名", "L", 2, "L組 次名"),
+        ("B", 1, "B組 首名", "待定(小組第三)"), ("A", 2, "A組 次名", "D", 2, "D組 次名"),
+        ("C", 1, "C組 首名", "待定(小組第三)"), ("E", 1, "E組 首名", "H", 1, "H組 首名"),
+        ("F", 1, "F組 首名", "待定(小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
+        ("I", 1, "I組 首名", "待定(小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
     l32_matches = [m for m in all_matches if m.get("stage") == "LAST_32"]
     l32_matches.sort(key=lambda x: x.get("utcDate") or "")
@@ -134,8 +134,8 @@ def inject_live_knockout_teams(all_matches, standings_data):
                 m["awayTeam"] = {"name": real_a}
 
     fallback_map = {
-        "LAST_16": "32強晉級隊", "QUARTER_FINALS": "16強晉級隊", 
-        "SEMI_FINALS": "8強晉級隊", "FINAL": "準決賽勝者", "THIRD_PLACE": "準決賽敗者"
+        "LAST_16": "32強勝者", "QUARTER_FINALS": "16強勝者", 
+        "SEMI_FINALS": "8強勝者", "FINAL": "準決賽勝者", "THIRD_PLACE": "準決賽敗者"
     }
     for m in all_matches:
         stage = m.get("stage")
@@ -149,14 +149,14 @@ def inject_live_knockout_teams(all_matches, standings_data):
 def get_mock_knockout_matches(standings_data):
     mock_matches = []
     mock_r32 = [
-        ("A", 1, "A組 首名", "待定 (小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
-        ("D", 1, "D組 首名", "待定 (小組第三)"), ("E", 2, "E組 次名", "F", 2, "F組 次名"),
-        ("G", 1, "G組 首名", "待定 (小組第三)"), ("H", 2, "H組 次名", "I", 2, "I組 次名"),
-        ("J", 1, "J組 首名", "待定 (小組第三)"), ("K", 2, "K組 次名", "L", 2, "L組 次名"),
-        ("B", 1, "B組 首名", "待定 (小組第三)"), ("A", 2, "A組 次名", "D", 2, "D組 次名"),
-        ("C", 1, "C組 首名", "待定 (小組第三)"), ("E", 1, "E組 首名", "H", 1, "H組 首名"),
-        ("F", 1, "F組 首名", "待定 (小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
-        ("I", 1, "I組 首名", "待定 (小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
+        ("A", 1, "A組 首名", "待定(小組第三)"), ("B", 2, "B組 次名", "C", 2, "C組 次名"),
+        ("D", 1, "D組 首名", "待定(小組第三)"), ("E", 2, "E組 次名", "F", 2, "F組 次名"),
+        ("G", 1, "G組 首名", "待定(小組第三)"), ("H", 2, "H組 次名", "I", 2, "I組 次名"),
+        ("J", 1, "J組 首名", "待定(小組第三)"), ("K", 2, "K組 次名", "L", 2, "L組 次名"),
+        ("B", 1, "B組 首名", "待定(小組第三)"), ("A", 2, "A組 次名", "D", 2, "D組 次名"),
+        ("C", 1, "C組 首名", "待定(小組第三)"), ("E", 1, "E組 首名", "H", 1, "H組 首名"),
+        ("F", 1, "F組 首名", "待定(小組第三)"), ("G", 2, "G組 次名", "J", 2, "J組 次名"),
+        ("I", 1, "I組 首名", "待定(小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
     for cfg in mock_r32:
         if len(cfg) == 4:
@@ -169,32 +169,34 @@ def get_mock_knockout_matches(standings_data):
             a = get_group_team(standings_data, g_a, p_a, mock_a)
         mock_matches.append({"stage": "LAST_32", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": h}, "awayTeam": {"name": a}, "score": {"fullTime": {"home": None, "away": None}}})
     
-    for _ in range(8):
-        mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強晉級隊"}, "awayTeam": {"name": "32強晉級隊"}, "score": {"fullTime": {"home": None, "away": None}}})
-    for _ in range(4):
-        mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "16強晉級隊"}, "awayTeam": {"name": "16強晉級隊"}, "score": {"fullTime": {"home": None, "away": None}}})
-    for _ in range(2):
-        mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "8強晉級隊"}, "awayTeam": {"name": "8強晉級隊"}, "score": {"fullTime": {"home": None, "away": None}}})
+    for _ in range(8): mock_matches.append({"stage": "LAST_16", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "32強勝者"}, "awayTeam": {"name": "32強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
+    for _ in range(4): mock_matches.append({"stage": "QUARTER_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "16強勝者"}, "awayTeam": {"name": "16強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
+    for _ in range(2): mock_matches.append({"stage": "SEMI_FINALS", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "8強勝者"}, "awayTeam": {"name": "8強勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
     mock_matches.append({"stage": "FINAL", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽勝者"}, "awayTeam": {"name": "準決賽勝者"}, "score": {"fullTime": {"home": None, "away": None}}})
     mock_matches.append({"stage": "THIRD_PLACE", "status": "SCHEDULED", "utcDate": "", "homeTeam": {"name": "準決賽敗者"}, "awayTeam": {"name": "準決賽敗者"}, "score": {"fullTime": {"home": None, "away": None}}})
     return mock_matches
 
+def get_padded_matches(matches, stage, expected_count):
+    stage_matches = [m for m in matches if m.get("stage") == stage]
+    stage_matches.sort(key=lambda x: x.get("utcDate") or "")
+    while len(stage_matches) < expected_count:
+        stage_matches.append({"homeTeam": {"name": "待定"}, "awayTeam": {"name": "待定"}})
+    return stage_matches[:expected_count]
+
 # ==========================================
-# 3. UI 模組：對齊與 SVG 繪圖核心
+# 3. UI 模組：對齊與 CSS 幾何定位引擎
 # ==========================================
-def get_connector_html(count):
-    """精準生成負責連線的 SVG 區塊"""
-    svg_html = '''
-    <div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%;">
-        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;">
-            <path d="M 0 25 L 50 25 L 50 75 L 0 75 M 50 50 L 100 50" stroke="#bdc1c6" stroke-width="2" vector-effect="non-scaling-stroke" fill="transparent"/>
-        </svg>
-    </div>
-    '''
-    return f'<div style="display: flex; flex-direction: column; width: 32px;">{svg_html * count}</div>'
+def get_connectors(count, height):
+    html = '<div style="display: flex; flex-direction: column; width: 15px;">'
+    for _ in range(count):
+        html += f'<div style="height: {height}px; display: flex; align-items: center; justify-content: flex-start;"><div style="width: 100%; height: {height // 2}px; border-top: 2px solid #bdc1c6; border-bottom: 2px solid #bdc1c6; border-right: 2px solid #bdc1c6; box-sizing: border-box;"></div></div>'
+    html += '</div><div style="display: flex; flex-direction: column; width: 20px;">'
+    for _ in range(count):
+        html += f'<div style="height: {height}px; display: flex; align-items: center; justify-content: flex-start;"><div style="width: 100%; height: 0px; border-top: 2px solid #bdc1c6;"></div></div>'
+    html += '</div>'
+    return html
 
 def get_match_card_html(match):
-    """包含 flex: 1 的自適應滿版包裹層，確保卡片強制置中"""
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
@@ -207,11 +209,11 @@ def get_match_card_html(match):
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
+    if "待定" in home or "勝者" in home or "敗者" in home: dt_display = "對手確認中"
 
     html = (
-        f'<div style="flex: 1; display: flex; align-items: center; justify-content: center; width: 100%;">'
         f'<div style="background-color: #ffffff; border: 1px solid #dadce0; border-radius: 8px; '
-        f'padding: 8px 12px; margin: 4px 0; width: 180px; box-sizing: border-box; font-family: sans-serif;">'
+        f'padding: 8px 12px; width: 170px; box-sizing: border-box; font-family: sans-serif; box-shadow: 0 1px 2px rgba(0,0,0,0.05); z-index: 10;">'
         f'<div style="font-size: 11px; color: #70757a; margin-bottom: 6px; border-bottom: 1px solid #f1f3f4; padding-bottom: 4px;">{dt_display}</div>'
         f'<div style="display: flex; justify-content: space-between; align-items: center; height: 22px;">'
         f'<span style="font-size: 13px; font-weight: 500; color: #202124; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 135px;">{home}</span>'
@@ -221,7 +223,7 @@ def get_match_card_html(match):
         f'<span style="font-size: 13px; font-weight: 500; color: #202124; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 135px;">{away}</span>'
         f'<span style="font-size: 13px; font-weight: bold; color: #202124;">{a_score}</span>'
         f'</div>'
-        f'</div></div>'
+        f'</div>'
     )
     return html
 
@@ -278,43 +280,52 @@ if "error" not in match_res:
         inject_live_knockout_teams(all_m, standings_data)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (高階全景連線版)")
-    tree_stages = ["LAST_32", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL", "THIRD_PLACE"]
+    st.subheader("🌳 淘汰賽晉級樹狀圖 (究極精確畫線版)")
     
-    col_html = {stage: "" for stage in tree_stages}
-    for stage in tree_stages:
-        stage_matches = [m for m in all_m if m.get("stage") == stage]
-        stage_matches.sort(key=lambda x: x.get("utcDate") or "")
-        for m in stage_matches:
-            col_html[stage] += get_match_card_html(m)
+    r1_m = get_padded_matches(all_m, "LAST_32", 16)
+    r2_m = get_padded_matches(all_m, "LAST_16", 8)
+    r3_m = get_padded_matches(all_m, "QUARTER_FINALS", 4)
+    r4_m = get_padded_matches(all_m, "SEMI_FINALS", 2)
+    r5_f = get_padded_matches(all_m, "FINAL", 1)[0]
+    r5_t = get_padded_matches(all_m, "THIRD_PLACE", 1)[0]
+
+    def build_col(matches, height):
+        res = ""
+        for m in matches: res += f'<div style="height: {height}px; display: flex; align-items: center; justify-content: center;">{get_match_card_html(m)}</div>'
+        return res
+
+    r1_html = build_col(r1_m, 90)
+    r2_html = build_col(r2_m, 180)
+    r3_html = build_col(r3_m, 360)
+    r4_html = build_col(r4_m, 720)
             
     bracket_html = (
         '<div style="overflow-x: auto; background-color: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid #eaebed; margin-top: 10px;">'
-        '<div style="display: flex; min-width: 1100px; margin-bottom: 12px;">'
-        '<div style="flex: 1 1 180px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">32強賽</div>'
-        '<div style="width: 32px;"></div>'
-        '<div style="flex: 1 1 180px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">16強賽</div>'
-        '<div style="width: 32px;"></div>'
-        '<div style="flex: 1 1 180px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">8強賽</div>'
-        '<div style="width: 32px;"></div>'
-        '<div style="flex: 1 1 180px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">4強賽</div>'
-        '<div style="width: 32px;"></div>'
-        '<div style="flex: 1 1 180px; text-align: center; font-weight: bold; color: #ea4335; font-size: 14px;">決賽階段</div>'
+        '<div style="display: flex; min-width: 1050px; margin-bottom: 12px; padding-left: 0px;">'
+        '<div style="width: 170px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">32強賽</div>'
+        '<div style="width: 35px;"></div>'
+        '<div style="width: 170px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">16強賽</div>'
+        '<div style="width: 35px;"></div>'
+        '<div style="width: 170px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">8強賽</div>'
+        '<div style="width: 35px;"></div>'
+        '<div style="width: 170px; text-align: center; font-weight: bold; color: #5f6368; font-size: 14px;">4強賽</div>'
+        '<div style="width: 35px;"></div>'
+        '<div style="width: 170px; text-align: center; font-weight: bold; color: #ea4335; font-size: 14px;">決賽階段</div>'
         '</div>'
-        '<div style="display: flex; min-width: 1100px; height: 1350px;">'
-        f'<div style="display: flex; flex-direction: column; width: 180px;">{col_html["LAST_32"]}</div>'
-        f'{get_connector_html(8)}'
-        f'<div style="display: flex; flex-direction: column; width: 180px;">{col_html["LAST_16"]}</div>'
-        f'{get_connector_html(4)}'
-        f'<div style="display: flex; flex-direction: column; width: 180px;">{col_html["QUARTER_FINALS"]}</div>'
-        f'{get_connector_html(2)}'
-        f'<div style="display: flex; flex-direction: column; width: 180px;">{col_html["SEMI_FINALS"]}</div>'
-        f'{get_connector_html(1)}'
-        f'<div style="display: flex; flex-direction: column; width: 180px; position: relative;">'
-        f'<div style="position: absolute; top: 50%; transform: translateY(-50%); width: 100%;">'
-        f'<div style="font-size:12px; color:#ea4335; font-weight:bold; text-align:center; margin-bottom:4px;">🏆 冠軍戰</div>{col_html["FINAL"]}</div>'
-        f'<div style="position: absolute; bottom: 40px; width: 100%;">'
-        f'<div style="font-size:12px; color:#5f6368; font-weight:bold; text-align:center; margin-bottom:4px;">🥉 季軍戰</div>{col_html["THIRD_PLACE"]}</div>'
+        '<div style="display: flex; min-width: 1050px; height: 1440px;">'
+        f'<div style="display: flex; flex-direction: column; width: 170px;">{r1_html}</div>'
+        f'{get_connectors(8, 180)}'
+        f'<div style="display: flex; flex-direction: column; width: 170px;">{r2_html}</div>'
+        f'{get_connectors(4, 360)}'
+        f'<div style="display: flex; flex-direction: column; width: 170px;">{r3_html}</div>'
+        f'{get_connectors(2, 720)}'
+        f'<div style="display: flex; flex-direction: column; width: 170px;">{r4_html}</div>'
+        f'{get_connectors(1, 1440)}'
+        f'<div style="display: flex; flex-direction: column; width: 170px; position: relative;">'
+        f'<div style="height: 1440px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">'
+        f'<div style="font-size:12px; color:#ea4335; font-weight:bold; margin-bottom:4px;">🏆 冠軍戰</div>{get_match_card_html(r5_f)}</div>'
+        f'<div style="position: absolute; top: 850px; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center;">'
+        f'<div style="font-size:12px; color:#5f6368; font-weight:bold; margin-bottom:4px;">🥉 季軍戰</div>{get_match_card_html(r5_t)}</div>'
         f'</div>'
         '</div></div>'
     )
