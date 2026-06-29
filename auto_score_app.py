@@ -39,7 +39,40 @@ TEAM_TRANSLATION = {
     "Cape Verde": "維德角", "Cape Verde Islands": "維德角", "TBD": "待定"
 }
 
-# 2026年 6月 最新發布之 FIFA 官方世界排名
+# 國家國旗 Emoji 資料庫
+TEAM_FLAG = {
+    "Argentina": "🇦🇷", "France": "🇫🇷", "Croatia": "🇭🇷", "Morocco": "🇲🇦",
+    "Netherlands": "🇳🇱", "England": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Brazil": "🇧🇷", "Portugal": "🇵🇹",
+    "Japan": "🇯🇵", "Senegal": "🇸🇳", "Australia": "🇦🇺", "Switzerland": "🇨🇭",
+    "Spain": "🇪🇸", "United States": "🇺🇸", "USA": "🇺🇸", "Poland": "🇵🇱",
+    "Korea Republic": "🇰🇷", "South Korea": "🇰🇷", "Cameroon": "🇨🇲", "Uruguay": "🇺🇾",
+    "Tunisia": "🇹🇳", "Mexico": "🇲🇽", "Belgium": "🇧🇪", "Ghana": "🇬🇭",
+    "Saudi Arabia": "🇸🇦", "Iran": "🇮🇷", "Iran (Islamic Republic of)": "🇮🇷",
+    "Costa Rica": "🇨🇷", "Denmark": "🇩🇰", "Serbia": "🇷🇸", "Wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+    "Ecuador": "🇪🇨", "Qatar": "🇶🇦", "Canada": "🇨🇦", "Germany": "🇩🇪",
+    "Italy": "🇮🇹", "Chile": "🇨🇱", "Colombia": "🇨🇴", "Peru": "🇵🇪",
+    "Sweden": "🇸🇪", "Nigeria": "🇳🇬", "Egypt": "🇪🇬", "Algeria": "🇩🇿",
+    "Côte d'Ivoire": "🇨🇮", "Ivory Coast": "🇨🇮", "Mali": "🇲🇱",
+    "Burkina Faso": "🇧🇫", "South Africa": "🇿🇦", "Congo DR": "🇨🇩",
+    "DR Congo": "🇨🇩", "Bosnia and Herzegovina": "🇧🇦", "Bosnia-Herzegovina": "🇧🇦", 
+    "Czechia": "🇨🇿", "Czech Republic": "🇨🇿", "Republic of Ireland": "🇮🇪", "Ireland": "🇮🇪",
+    "Northern Ireland": "🇬🇧", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Austria": "🇦🇹", 
+    "Hungary": "🇭🇺", "Slovakia": "🇸🇰", "Paraguay": "🇵🇾", 
+    "Venezuela": "🇻🇪", "Bolivia": "🇧🇴", "New Zealand": "🇳🇿",
+    "Haiti": "🇭🇹", "Jamaica": "🇯🇲", "Honduras": "🇭🇳", "El Salvador": "🇸🇻",
+    "Panama": "🇵🇦", "Cuba": "🇨🇺", "Trinidad and Tobago": "🇹🇹",
+    "Curaçao": "🇨🇼", "Iraq": "🇮🇶", "Syria": "🇸🇾", "United Arab Emirates": "🇦🇪",
+    "Uzbekistan": "🇺🇿", "China PR": "🇨🇳", "Oman": "🇴🇲", "Bahrain": "🇧🇭",
+    "Jordan": "🇯🇴", "Lebanon": "🇱🇧", "Vietnam": "🇻🇳", "Thailand": "🇹🇭",
+    "Indonesia": "🇮🇩", "Malaysia": "🇲🇾", "India": "🇮🇳", "Türkiye": "🇹🇷",
+    "Turkey": "🇹🇷", "Greece": "🇬🇷", "Romania": "🇷🇴", "Bulgaria": "🇧🇬",
+    "Ukraine": "🇺🇦", "Russia": "🇷🇺", "Iceland": "🇮🇸", "Finland": "🇫🇮",
+    "Norway": "🇳🇴", "Slovenia": "🇸🇮", "Albania": "🇦🇱", 
+    "North Macedonia": "🇲🇰", "Georgia": "🇬🇪", "Armenia": "🇦🇲", "Israel": "🇮🇱",
+    "Cape Verde": "🇨🇻", "Cape Verde Islands": "🇨🇻", "Kosovo": "🇽🇰",
+    "Montenegro": "🇲🇪", "Guinea": "🇬🇳", "Gabon": "🇬🇦", "Benin": "🇧🇯"
+}
+
 TEAM_RANKING = {
     "Argentina": 1, "Spain": 2, "France": 3, "England": 4, "Portugal": 5,
     "Brazil": 6, "Morocco": 7, "Netherlands": 8, "Belgium": 9, "Germany": 10,
@@ -235,7 +268,7 @@ def get_padded_matches(matches, stage, expected_count):
     return stage_matches[:expected_count]
 
 # ==========================================
-# 3. UI 模組：帶入世界排名的完美 SVG 畫線與防溢出系統
+# 3. UI 模組：世界排名 + Emoji 國旗 + 防溢出系統
 # ==========================================
 def get_svg_connector(count, h):
     svg_h = 2 * h
@@ -254,12 +287,13 @@ def get_match_card_html(match):
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
 
-    h_rank = TEAM_RANKING.get(home_en.strip(), "")
-    a_rank = TEAM_RANKING.get(away_en.strip(), "")
+    h_rank = TEAM_RANKING.get(home_en.strip(), "") if is_real_team(home_en) else ""
+    a_rank = TEAM_RANKING.get(away_en.strip(), "") if is_real_team(away_en) else ""
+    h_flag = TEAM_FLAG.get(home_en.strip(), "🏳️") + " " if is_real_team(home_en) else ""
+    a_flag = TEAM_FLAG.get(away_en.strip(), "🏳️") + " " if is_real_team(away_en) else ""
     
-    # 內聯世界排名標籤，同時保有 Flex 空間壓縮特性
-    h_display = f"{home} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{h_rank}</span>" if h_rank else home
-    a_display = f"{away} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{a_rank}</span>" if a_rank else away
+    h_display = f"{h_flag}{home} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{h_rank}</span>" if h_rank else f"{h_flag}{home}"
+    a_display = f"{a_flag}{away} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{a_rank}</span>" if a_rank else f"{a_flag}{away}"
 
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
@@ -285,8 +319,11 @@ def display_match_item(match):
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
     
-    h_rank = TEAM_RANKING.get(home_en.strip(), "")
-    a_rank = TEAM_RANKING.get(away_en.strip(), "")
+    h_rank = TEAM_RANKING.get(home_en.strip(), "") if is_real_team(home_en) else ""
+    a_rank = TEAM_RANKING.get(away_en.strip(), "") if is_real_team(away_en) else ""
+    h_flag = TEAM_FLAG.get(home_en.strip(), "🏳️") + " " if is_real_team(home_en) else ""
+    a_flag = TEAM_FLAG.get(away_en.strip(), "🏳️") + " " if is_real_team(away_en) else ""
+    
     h_rank_str = f" (#{h_rank})" if h_rank else ""
     a_rank_str = f" (#{a_rank})" if a_rank else ""
     
@@ -300,15 +337,15 @@ def display_match_item(match):
     time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定"
     
     st.markdown("---")
-    st.markdown(f"### 🏟️ {home}{h_rank_str} 🆚 {away}{a_rank_str} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
+    st.markdown(f"### 🏟️ {h_flag}{home}{h_rank_str} 🆚 {a_flag}{away}{a_rank_str} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
     
     h_display = "-" if h_score is None else h_score
     a_display = "-" if a_score is None else a_score
     
     c1, c2, c3 = st.columns(3)
-    c1.metric(label=f"{home}{h_rank_str}", value=h_display)
+    c1.metric(label=f"{h_flag}{home}{h_rank_str}", value=h_display)
     c2.metric(label="賽事狀態", value=status_text)
-    c3.metric(label=f"{away}{a_rank_str}", value=a_display)
+    c3.metric(label=f"{a_flag}{away}{a_rank_str}", value=a_display)
 
 # ==========================================
 # 3. 網頁介面
@@ -344,7 +381,7 @@ if "error" not in match_res:
                 m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (附帶世界排名)")
+    st.subheader("🌳 淘汰賽晉級樹狀圖 (附帶國旗與世界排名)")
     
     r1_m = get_padded_matches(all_m, "LAST_32", 16)
     r2_m = get_padded_matches(all_m, "LAST_16", 8)
@@ -400,8 +437,10 @@ with sub_tab3:
             for entry in group_data.get("table", []):
                 team_en = entry.get("team", {}).get("name") or "TBD"
                 team_zh = TEAM_TRANSLATION.get(team_en.strip(), team_en)
+                t_flag = TEAM_FLAG.get(team_en.strip(), "🏳️") + " " if is_real_team(team_en) else ""
+                
                 table_rows.append({
-                    "排名": entry.get("position"), "球隊": team_zh, "已賽": entry.get("playedGames"),
+                    "排名": entry.get("position"), "球隊": f"{t_flag}{team_zh}", "已賽": entry.get("playedGames"),
                     "勝": entry.get("won"), "和": entry.get("draw"), "敗": entry.get("lost"),
                     "進/失球": f"{entry.get('goalsFor')} / {entry.get('goalsAgainst')}",
                     "淨勝球(GD)": entry.get("goalDifference"), "總積分": entry.get("points")
