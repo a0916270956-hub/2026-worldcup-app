@@ -39,6 +39,32 @@ TEAM_TRANSLATION = {
     "Cape Verde": "維德角", "Cape Verde Islands": "維德角", "TBD": "待定"
 }
 
+# 2026年 6月 最新發布之 FIFA 官方世界排名
+TEAM_RANKING = {
+    "Argentina": 1, "Spain": 2, "France": 3, "England": 4, "Portugal": 5,
+    "Brazil": 6, "Morocco": 7, "Netherlands": 8, "Belgium": 9, "Germany": 10,
+    "Croatia": 11, "Italy": 12, "Colombia": 13, "Mexico": 14, "Senegal": 15,
+    "Uruguay": 16, "USA": 17, "United States": 17, "Japan": 18, "Switzerland": 19,
+    "Iran": 20, "Iran (Islamic Republic of)": 20, "Denmark": 21, "Türkiye": 22, "Turkey": 22,
+    "Ecuador": 23, "Austria": 24, "South Korea": 25, "Korea Republic": 25, 
+    "Nigeria": 26, "Australia": 27, "Algeria": 28, "Egypt": 29, "Canada": 30,
+    "Norway": 31, "Ukraine": 32, "Côte d'Ivoire": 33, "Ivory Coast": 33,
+    "Panama": 34, "Russia": 35, "Poland": 36, "Wales": 37, "Sweden": 38,
+    "Hungary": 39, "Czechia": 40, "Czech Republic": 40, "Paraguay": 41,
+    "Scotland": 42, "Serbia": 43, "Cameroon": 44, "Tunisia": 45,
+    "DR Congo": 46, "Congo DR": 46, "Slovakia": 47, "Greece": 48,
+    "Venezuela": 49, "Uzbekistan": 50, "Chile": 51, "Peru": 52,
+    "Costa Rica": 53, "Romania": 54, "Mali": 55, "Qatar": 56, "Iraq": 57,
+    "Republic of Ireland": 58, "Ireland": 58, "Slovenia": 59, "South Africa": 60,
+    "Saudi Arabia": 61, "Burkina Faso": 62, "Jordan": 63, "Bosnia and Herzegovina": 64,
+    "Bosnia-Herzegovina": 64, "Honduras": 65, "Albania": 66, "Cape Verde": 67, 
+    "Cape Verde Islands": 67, "United Arab Emirates": 68, "North Macedonia": 69, 
+    "Northern Ireland": 70, "Jamaica": 71, "Georgia": 72, "Ghana": 73, "Iceland": 74, 
+    "Finland": 75, "Israel": 76, "Bolivia": 77, "Kosovo": 78, "Oman": 79, "Montenegro": 80,
+    "Guinea": 81, "Curaçao": 82, "Haiti": 83, "Syria": 84, "New Zealand": 85,
+    "Gabon": 86, "Bulgaria": 87, "China PR": 91, "Benin": 93, "Lebanon": 115
+}
+
 STATUS_MAP = {
     "FINISHED": "已完賽", "IN_PLAY": "進行中", "PAUSED": "中場休息",
     "TIMED": "未開始", "SCHEDULED": "未開始", "POSTPONED": "延期"
@@ -209,7 +235,7 @@ def get_padded_matches(matches, stage, expected_count):
     return stage_matches[:expected_count]
 
 # ==========================================
-# 3. UI 模組：絕對無斷行 SVG 畫線與防溢出置中系統
+# 3. UI 模組：帶入世界排名的完美 SVG 畫線與防溢出系統
 # ==========================================
 def get_svg_connector(count, h):
     svg_h = 2 * h
@@ -228,6 +254,13 @@ def get_match_card_html(match):
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
 
+    h_rank = TEAM_RANKING.get(home_en.strip(), "")
+    a_rank = TEAM_RANKING.get(away_en.strip(), "")
+    
+    # 內聯世界排名標籤，同時保有 Flex 空間壓縮特性
+    h_display = f"{home} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{h_rank}</span>" if h_rank else home
+    a_display = f"{away} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{a_rank}</span>" if a_rank else away
+
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
     h_score = full_time.get("home") if full_time.get("home") is not None else "-"
@@ -236,7 +269,7 @@ def get_match_card_html(match):
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
 
-    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:6px 10px;width:170px;height:82px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:11px;line-height:1.2;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{dt_display}</div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{home}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{away}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{a_score}</span></div></div>'
+    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:6px 10px;width:170px;height:82px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:11px;line-height:1.2;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{dt_display}</div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{h_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{a_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{a_score}</span></div></div>'
     return html
 
 def build_col(matches, cell_height):
@@ -252,6 +285,11 @@ def display_match_item(match):
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
     away = TEAM_TRANSLATION.get(away_en.strip(), away_en)
     
+    h_rank = TEAM_RANKING.get(home_en.strip(), "")
+    a_rank = TEAM_RANKING.get(away_en.strip(), "")
+    h_rank_str = f" (#{h_rank})" if h_rank else ""
+    a_rank_str = f" (#{a_rank})" if a_rank else ""
+    
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
     h_score = full_time.get("home")
@@ -262,15 +300,15 @@ def display_match_item(match):
     time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定"
     
     st.markdown("---")
-    st.markdown(f"### 🏟️ {home} 🆚 {away} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
+    st.markdown(f"### 🏟️ {home}{h_rank_str} 🆚 {away}{a_rank_str} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
     
     h_display = "-" if h_score is None else h_score
     a_display = "-" if a_score is None else a_score
     
     c1, c2, c3 = st.columns(3)
-    c1.metric(label=home, value=h_display)
+    c1.metric(label=f"{home}{h_rank_str}", value=h_display)
     c2.metric(label="賽事狀態", value=status_text)
-    c3.metric(label=away, value=a_display)
+    c3.metric(label=f"{away}{a_rank_str}", value=a_display)
 
 # ==========================================
 # 3. 網頁介面
@@ -306,7 +344,7 @@ if "error" not in match_res:
                 m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (手機防溢出版)")
+    st.subheader("🌳 淘汰賽晉級樹狀圖 (附帶世界排名)")
     
     r1_m = get_padded_matches(all_m, "LAST_32", 16)
     r2_m = get_padded_matches(all_m, "LAST_16", 8)
