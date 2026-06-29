@@ -109,7 +109,6 @@ def get_group_team(standings_data, group_letter, pos, fallback):
     return fallback
 
 def get_mock_date(stage, index):
-    """根據 2026 世足賽真實預估賽程，回傳預設開踢時間 (UTC)"""
     base_dates = {
         "LAST_32": datetime(2026, 6, 28, 12, 0, 0),
         "LAST_16": datetime(2026, 7, 4, 12, 0, 0),
@@ -216,7 +215,7 @@ def get_padded_matches(matches, stage, expected_count):
     return stage_matches[:expected_count]
 
 # ==========================================
-# 3. UI 模組：絕對無斷行 SVG 畫線與置中系統
+# 3. UI 模組：絕對無斷行 SVG 畫線與防溢出置中系統
 # ==========================================
 def get_svg_connector(count, h):
     svg_h = 2 * h
@@ -230,6 +229,7 @@ def get_svg_connector(count, h):
     return res
 
 def get_match_card_html(match):
+    """防手機溢出升級版：引入嚴格行高鎖定 (line-height) 與 Flexbox 溢出保護"""
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
@@ -243,7 +243,8 @@ def get_match_card_html(match):
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
 
-    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:8px 12px;width:170px;height:76px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:11px;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:4px;margin-bottom:2px;">{dt_display}</div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">{home}</span><span style="font-size:13px;font-weight:bold;color:#202124;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">{away}</span><span style="font-size:13px;font-weight:bold;color:#202124;">{a_score}</span></div></div>'
+    # 注意這裡的高度增長至 82px，並鎖定所有內部元素的行高以防止手機字體放大導致垂直破版
+    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:6px 10px;width:170px;height:82px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:11px;line-height:1.2;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{dt_display}</div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{home}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{away}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{a_score}</span></div></div>'
     return html
 
 def build_col(matches, cell_height):
@@ -310,7 +311,6 @@ else:
     else:
         inject_live_knockout_teams(all_matches, standings_data)
         
-    # 全局修復：確保所有淘汰賽階段的賽事都有預估時間，避免 API 缺漏導致顯示「時間待定」
     for stage_code in ko_stages:
         s_matches = [m for m in all_matches if m.get("stage") == stage_code]
         s_matches.sort(key=lambda x: x.get("utcDate") or "")
@@ -321,8 +321,8 @@ else:
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌳 晉級樹狀圖", "🏆 淘汰賽列表", "⚽ 分組賽進度", "📊 各組積分與數據", "📡 今日與次日焦點"])
     
     with tab1:
-        st.subheader("🌳 淘汰賽晉級樹狀圖 (完美 SVG 無縫版)")
-        st.caption("💡 提示：介面已全面升級為絕對無亂碼的 SVG 數學繪圖引擎，且已為所有未定賽程補上 2026 真實預估開踢時間！")
+        st.subheader("🌳 淘汰賽晉級樹狀圖 (手機防溢出版)")
+        st.caption("💡 提示：介面已全面升級，確保在手機瀏覽器放大字體時，卡片文字仍受到嚴格約束並維持原比例。")
         
         r1_m = get_padded_matches(all_matches, "LAST_32", 16)
         r2_m = get_padded_matches(all_matches, "LAST_16", 8)
