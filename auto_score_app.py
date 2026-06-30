@@ -113,6 +113,14 @@ def is_real_team(team_name):
     fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "MATCH", "1ST", "2ND", "3RD", "晉級", "首名", "次名", "第三名", "勝者", "敗者", "UNKNOWN"]
     return not any(kw in str(team_name).upper() for kw in fake_keywords)
 
+def get_real_teams(match):
+    h = match.get("homeTeam", {}).get("name")
+    a = match.get("awayTeam", {}).get("name")
+    res = []
+    if is_real_team(h): res.append(h)
+    if is_real_team(a): res.append(a)
+    return res
+
 # ==========================================
 # 2. 核心數據抓取與智慧預填
 # ==========================================
@@ -190,8 +198,7 @@ def inject_live_knockout_teams(all_matches, standings_data):
         ("I", 1, "I組 首名", "待定(小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
     l32_matches = [m for m in all_matches if m.get("stage") == "LAST_32"]
-    # 【關鍵修正】: 取消以時間排序，確保樹狀圖配對路線正確
-    l32_matches.sort(key=lambda x: x.get("id", 0))
+    l32_matches.sort(key=lambda x: x.get("utcDate") or "")
     
     for i, m in enumerate(l32_matches):
         if i < len(mock_r32):
@@ -255,8 +262,7 @@ def get_mock_knockout_matches(standings_data):
 
 def get_padded_matches(matches, stage, expected_count):
     stage_matches = [m for m in matches if m.get("stage") == stage]
-    # 【關鍵修正】: 避免以時間打亂對立組合
-    stage_matches.sort(key=lambda x: x.get("id", 0))
+    stage_matches.sort(key=lambda x: x.get("utcDate") or "")
     while len(stage_matches) < expected_count:
         idx = len(stage_matches)
         stage_matches.append({
@@ -267,6 +273,57 @@ def get_padded_matches(matches, stage, expected_count):
             "awayTeam": {"name": "待定"}
         })
     return stage_matches[:expected_count]
+
+def sort_matches_for_bracket(current_matches, next_matches):
+    if not next_matches:
+        return current_matches
+    
+    sorted_matches = []
+    used_ids = set()
+    
+    for nm in next_matches:
+        h_team = nm.get("homeTeam", {}).get("name")
+        a_team = nm.get("awayTeam", {}).get("name")
+        
+        h_feeder = None
+        a_feeder = None
+        
+        if is_real_team(h_team):
+            for cm in current_matches:
+                if id(cm) not in used_ids and h_team in get_real_teams(cm):
+                    h_feeder = cm
+                    used_ids.add(id(cm))
+                    break
+        
+        if is_real_team(a_team):
+            for cm in current_matches:
+                if id(cm) not in used_ids and a_team in get_real_teams(cm):
+                    a_feeder = cm
+                    used_ids.add(id(cm))
+                    break
+                    
+        if not h_feeder:
+            for cm in current_matches:
+                if id(cm) not in used_ids:
+                    h_feeder = cm
+                    used_ids.add(id(cm))
+                    break
+        if not a_feeder:
+            for cm in current_matches:
+                if id(cm) not in used_ids:
+                    a_feeder = cm
+                    used_ids.add(id(cm))
+                    break
+        
+        if h_feeder: sorted_matches.append(h_feeder)
+        if a_feeder: sorted_matches.append(a_feeder)
+        
+    for cm in current_matches:
+        if id(cm) not in used_ids:
+            sorted_matches.append(cm)
+            used_ids.add(id(cm))
+            
+    return sorted_matches
 
 # ==========================================
 # 3. UI 模組：圖片國旗支援與 HTML 卡片重構
@@ -282,7 +339,6 @@ def get_flag_html(team_en, height=14):
     return ""
 
 def get_svg_connector(count, h):
-    """繪製連接線"""
     svg_h = 2 * h
     y1 = h / 2
     y2 = y1 + h
@@ -327,7 +383,6 @@ def build_col(matches, cell_height):
     return res
 
 def display_match_item(match):
-    """採用 Flexbox 的客製化精緻賽程卡，取代 st.metric，解決排版與字體國旗問題"""
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
@@ -402,20 +457,22 @@ if "error" not in match_res:
         
     for stage_code in ko_stages:
         s_matches = [m for m in all_m if m.get("stage") == stage_code]
-        # 【關鍵修正】: 取消以時間排序，確保賽事維持晉級路線對位
-        s_matches.sort(key=lambda x: x.get("id", 0))
+        s_matches.sort(key=lambda x: x.get("utcDate") or "")
         for i, m in enumerate(s_matches):
             if not m.get("utcDate"):
                 m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (依據結構排列配對)")
+    st.subheader("🌳 淘汰賽晉級樹狀圖 (嚴格拓樸配對版)")
     
-    r1_m = get_padded_matches(all_m, "LAST_32", 16)
-    r2_m = get_padded_matches(all_m, "LAST_16", 8)
-    r3_m = get_padded_matches(all_m, "QUARTER_FINALS", 4)
-    r4_m = get_padded_matches(all_m, "SEMI_FINALS", 2)
-    r5_f = get_padded_matches(all_m, "FINAL", 1)[0]
+    # 完全一樣的逆向溯源排版
+    r5_m = get_padded_matches(all_m, "FINAL", 1)
+    r4_m = sort_matches_for_bracket(get_padded_matches(all_m, "SEMI_FINALS", 2), r5_m)
+    r3_m = sort_matches_for_bracket(get_padded_matches(all_m, "QUARTER_FINALS", 4), r4_m)
+    r2_m = sort_matches_for_bracket(get_padded_matches(all_m, "LAST_16", 8), r3_m)
+    r1_m = sort_matches_for_bracket(get_padded_matches(all_m, "LAST_32", 16), r2_m)
+    
+    r5_f = r5_m[0]
     r5_t = get_padded_matches(all_m, "THIRD_PLACE", 1)[0]
 
     r1_html = build_col(r1_m, 90)
@@ -427,7 +484,6 @@ with sub_tab1:
     
     header_html = '<div style="display:flex;min-width:1000px;margin-bottom:12px;"><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">32強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">16強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">8強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">4強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#ea4335;font-size:14px;">決賽階段</div></div>'
     
-    # 重新帶入 get_svg_connector 將結構重新連線
     bracket_container = f'<div style="display:flex;min-width:1000px;height:1440px;">{r1_html}{get_svg_connector(8, 90)}{r2_html}{get_svg_connector(4, 180)}{r3_html}{get_svg_connector(2, 360)}{r4_html}{get_svg_connector(1, 720)}{r5_html}</div>'
 
     bracket_html = f'<div style="overflow-x:auto;background-color:#f8f9fa;padding:20px;border-radius:12px;border:1px solid #eaebed;margin-top:10px;">{header_html}{bracket_container}</div>'
