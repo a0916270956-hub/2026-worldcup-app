@@ -21,7 +21,7 @@ TEAM_TRANSLATION = {
     "Sweden": "瑞典", "Nigeria": "奈及利亞", "Egypt": "埃及", "Algeria": "阿爾及利亞",
     "Côte d'Ivoire": "象牙海岸", "Ivory Coast": "象牙海岸", "Mali": "馬利",
     "Burkina Faso": "布吉納法索", "South Africa": "南非", "Congo DR": "剛果民主共和國",
-    "DR Congo": "剛果民主共和國", "Bosnia and Herzegovina": "波赫", "Bosnia-Herzegovina": "波赫", 
+    "DR Congo": "剛果民主共和国", "Bosnia and Herzegovina": "波赫", "Bosnia-Herzegovina": "波赫", 
     "Czechia": "捷克", "Czech Republic": "捷克", "Republic of Ireland": "愛爾蘭", 
     "Northern Ireland": "北愛爾蘭", "Scotland": "蘇格蘭", "Austria": "奧地利", 
     "Hungary": "匈牙利", "Slovakia": "斯洛伐克", "Paraguay": "巴拉圭", 
@@ -115,7 +115,7 @@ GROUP_MAP = {
 }
 
 # ==========================================
-# 2. 核心數據與正向拓樸配對演算法
+# 2. 核心數據與正向結構鎖定配對演算法
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_all_matches():
@@ -268,13 +268,13 @@ def get_padded_matches(matches, stage, expected_count):
             "status": "SCHEDULED",
             "utcDate": get_mock_date(stage, idx),
             "homeTeam": {"name": "待定"}, 
-            "awayTeam": {"name": "待定"}
+            "awayTeam": {"name": "待定"},
+            "score": {"fullTime": {"home": None, "away": None}}
         })
     return stage_matches[:expected_count]
 
-# --- 核心更新：絕對路徑正向配對法 (Forward Structural Mapping) ---
 def sort_r1_by_layout(matches):
-    """嚴格將 32 強鎖死在您截圖對應的標準位置，無論開踢時間為何"""
+    """將 32 強賽鎖死在標準對戰樹狀區間上"""
     bracket_layout = [
         {"Germany", "德國", "Paraguay", "巴拉圭"},
         {"France", "法國", "Sweden", "瑞典"},
@@ -304,50 +304,63 @@ def sort_r1_by_layout(matches):
     
     return sorted(matches, key=get_idx)
 
+# --- 核心優化：雙軌結構鎖定演算法 (Dual-Pass Structural Lock) ---
 def sort_subsequent_stage(prev_stage_matches, current_stage_matches):
-    """強迫 16 強、8 強依照上一輪的分組順序正向排列，確保連接線 100% 完美對齊"""
-    sorted_current = []
-    used = set()
-    for i in range(0, len(prev_stage_matches), 2):
-        if i+1 >= len(prev_stage_matches): break
+    """
+    全新雙軌結構配對：
+    第一軌：優先為每個分支尋找擁有相同真實球隊的下一輪賽事。
+    第二軌：其餘未賽出的格子（TBD）以賸餘空白賽事填補，絕不准許跳格抽調。
+    """
+    slots_count = len(prev_stage_matches) // 2
+    slot_matches = [None] * slots_count
+    used_ids = set()
+    
+    # 第一軌：精準依球隊名稱對位
+    for slot_idx in range(slots_count):
+        i = slot_idx * 2
         feeder_1 = prev_stage_matches[i]
         feeder_2 = prev_stage_matches[i+1]
         
-        possible_teams = {
-            feeder_1.get("homeTeam", {}).get("name", ""),
-            feeder_1.get("awayTeam", {}).get("name", ""),
-            feeder_2.get("homeTeam", {}).get("name", ""),
-            feeder_2.get("awayTeam", {}).get("name", "")
-        }
-        
-        match_found = None
+        possible_teams = set()
+        for m in [feeder_1, feeder_2]:
+            h = m.get("homeTeam", {}).get("name", "")
+            a = m.get("awayTeam", {}).get("name", "")
+            if is_real_team(h): possible_teams.add(h)
+            if is_real_team(a): possible_teams.add(a)
+            
         for m in current_stage_matches:
-            if id(m) in used: continue
+            if id(m) in used_ids: continue
             m_h = m.get("homeTeam", {}).get("name", "")
             m_a = m.get("awayTeam", {}).get("name", "")
-            if (is_real_team(m_h) and m_h in possible_teams) or (is_real_team(m_a) and m_a in possible_teams):
-                match_found = m
+            if (m_h and m_h in possible_teams) or (m_a and m_a in possible_teams):
+                slot_matches[slot_idx] = m
+                used_ids.add(id(m))
                 break
                 
-        if match_found:
-            sorted_current.append(match_found)
-            used.add(id(match_found))
-        else:
+    # 第二軌：將其餘尚未決定球隊的賽事依序分配到賸餘的空白格子中
+    for slot_idx in range(slots_count):
+        if slot_matches[slot_idx] is None:
             for m in current_stage_matches:
-                if id(m) not in used:
-                    sorted_current.append(m)
-                    used.add(id(m))
+                if id(m) not in used_ids:
+                    slot_matches[slot_idx] = m
+                    used_ids.add(id(m))
                     break
                     
-    for m in current_stage_matches:
-        if id(m) not in used:
-            sorted_current.append(m)
-            used.add(id(m))
-            
-    return sorted_current
+    final_matches = []
+    for m in slot_matches:
+        if m is not None:
+            final_matches.append(m)
+        else:
+            final_matches.append({
+                "status": "SCHEDULED",
+                "homeTeam": {"name": "待定"},
+                "awayTeam": {"name": "待定"},
+                "score": {"fullTime": {"home": None, "away": None}}
+            })
+    return final_matches
 
 # ==========================================
-# 3. UI 模組：圖片國旗支援與 HTML 卡片重構
+# 3. UI 模組：支援 PK 括號統計之比分渲染器
 # ==========================================
 def get_flag_url(team_en):
     code = TEAM_FLAG_CODE.get(team_en.strip())
@@ -370,6 +383,18 @@ def get_svg_connector(count, h):
     res += '</div>'
     return res
 
+def parse_display_score(full_time_score, penalties_score):
+    """
+    全新比分解析器：
+    常規賽與 PK 戰分數獨立統計。若有 PK 戰，PK 分數將以括號標示。
+    """
+    if full_time_score is None:
+        return "-"
+    base = str(full_time_score)
+    if penalties_score is not None:
+        return f"{base} ({penalties_score})"
+    return base
+
 def get_match_card_html(match):
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
@@ -387,8 +412,10 @@ def get_match_card_html(match):
 
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
-    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
-    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
+    penalties = score_obj.get("penalties", {}) or {}
+    
+    h_score = parse_display_score(full_time.get("home"), penalties.get("home"))
+    a_score = parse_display_score(full_time.get("away"), penalties.get("away"))
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
@@ -419,8 +446,10 @@ def display_match_item(match, display_date=True):
     
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
-    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
-    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
+    penalties = score_obj.get("penalties", {}) or {}
+    
+    h_score = parse_display_score(full_time.get("home"), penalties.get("home"))
+    a_score = parse_display_score(full_time.get("away"), penalties.get("away"))
     
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
@@ -479,7 +508,6 @@ else:
         
     for stage_code in ko_stages:
         s_matches = [m for m in all_matches if m.get("stage") == stage_code]
-        # 此處的時間排序只是初次基底，樹狀圖區塊會由下方強制定序
         s_matches.sort(key=lambda x: x.get("utcDate") or "")
         for i, m in enumerate(s_matches):
             if not m.get("utcDate"):
@@ -488,10 +516,10 @@ else:
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌳 晉級樹狀圖", "🏆 淘汰賽列表", "⚽ 分組賽進度", "📊 各組積分與數據", "📡 今日與次日焦點"])
     
     with tab1:
-        st.subheader("🌳 淘汰賽晉級樹狀圖 (HK01 標準籤表正向對位)")
-        st.caption("💡 提示：已啟動絕對路徑正向配對法，32 強籤表完全鎖死，勝方連線 100% 絕對歸位，絕無交錯！")
+        st.subheader("🌳 淘汰賽晉級樹狀圖 (雙軌結構鎖定版)")
+        st.caption("💡 提示：已全面啟用結構性雙軌對位！已賽出隊伍（如巴西）將完美鎖定在其專屬的晉級分支內，且 PK 戰分數已成功以括號分離統計。")
         
-        # 關鍵重組：32強強制對位，16、8、4強強制繼承上一輪路徑
+        # 核心對齊：32強依截圖定序，其餘輪次使用全新雙軌鎖定函數
         r1_m = sort_r1_by_layout(get_padded_matches(all_matches, "LAST_32", 16))
         r2_m = sort_subsequent_stage(r1_m, get_padded_matches(all_matches, "LAST_16", 8))
         r3_m = sort_subsequent_stage(r2_m, get_padded_matches(all_matches, "QUARTER_FINALS", 4))
@@ -509,7 +537,6 @@ else:
         
         header_html = '<div style="display:flex;min-width:1000px;margin-bottom:12px;"><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">32強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">16強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">8強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">4強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#ea4335;font-size:14px;">決賽階段</div></div>'
         
-        # 連接線完美繪出
         bracket_container = f'<div style="display:flex;min-width:1000px;height:1440px;">{r1_html}{get_svg_connector(8, 90)}{r2_html}{get_svg_connector(4, 180)}{r3_html}{get_svg_connector(2, 360)}{r4_html}{get_svg_connector(1, 720)}{r5_html}</div>'
 
         bracket_html = f'<div style="overflow-x:auto;background-color:#f8f9fa;padding:20px;border-radius:12px;border:1px solid #eaebed;margin-top:10px;">{header_html}{bracket_container}</div>'
@@ -521,7 +548,6 @@ else:
         ko_matches_updated = [m for m in all_matches if m.get("stage") in ko_stages]
         for stage_code in reversed(ko_stages):
             stage_matches = [m for m in ko_matches_updated if m.get("stage") == stage_code]
-            # 列表模式保留「時間順序」，方便觀看賽事順序
             stage_matches.sort(key=lambda x: x.get("utcDate") or "")
             if stage_matches:
                 with st.expander(STAGE_MAP.get(stage_code, stage_code)):
