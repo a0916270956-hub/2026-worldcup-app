@@ -39,7 +39,6 @@ TEAM_TRANSLATION = {
     "Cape Verde": "維德角", "Cape Verde Islands": "維德角", "TBD": "待定"
 }
 
-# ISO 3166-1 alpha-2 國家代碼 (對接 FlagCDN 解決 Windows 不支援 Emoji 國旗問題)
 TEAM_FLAG_CODE = {
     "Argentina": "ar", "France": "fr", "Croatia": "hr", "Morocco": "ma",
     "Netherlands": "nl", "England": "gb-eng", "Brazil": "br", "Portugal": "pt",
@@ -197,7 +196,8 @@ def inject_live_knockout_teams(all_matches, standings_data):
         ("I", 1, "I組 首名", "待定(小組第三)"), ("K", 1, "K組 首名", "L", 1, "L組 首名")
     ]
     l32_matches = [m for m in all_matches if m.get("stage") == "LAST_32"]
-    l32_matches.sort(key=lambda x: x.get("utcDate") or "")
+    # 【關鍵修正】: 取消以時間排序，改依據 API 賽事 ID (維持樹狀圖正確配對路徑)
+    l32_matches.sort(key=lambda x: x.get("id", 0))
     
     for i, m in enumerate(l32_matches):
         if i < len(mock_r32):
@@ -261,7 +261,8 @@ def get_mock_knockout_matches(standings_data):
 
 def get_padded_matches(matches, stage, expected_count):
     stage_matches = [m for m in matches if m.get("stage") == stage]
-    stage_matches.sort(key=lambda x: x.get("utcDate") or "")
+    # 【關鍵修正】: 取消以時間排序，確保樹狀圖排列對位正確
+    stage_matches.sort(key=lambda x: x.get("id", 0))
     while len(stage_matches) < expected_count:
         idx = len(stage_matches)
         stage_matches.append({
@@ -285,6 +286,18 @@ def get_flag_html(team_en, height=14):
     if url:
         return f'<img src="{url}" style="height:{height}px; width:auto; vertical-align:middle; margin-right:4px; border-radius:2px; box-shadow:0 0 1px rgba(0,0,0,0.3);">'
     return ""
+
+def get_svg_connector(count, h):
+    """繪製連接線"""
+    svg_h = 2 * h
+    y1 = h / 2
+    y2 = y1 + h
+    y_mid = h
+    res = '<div style="display:flex;flex-direction:column;width:30px;">'
+    for _ in range(count):
+        res += f'<div style="height:{svg_h}px;display:flex;align-items:center;justify-content:center;"><svg width="30" height="{svg_h}" style="display:block;"><path d="M 0 {y1} L 15 {y1} L 15 {y2} L 0 {y2} M 15 {y_mid} L 30 {y_mid}" stroke="#bdc1c6" stroke-width="2" fill="transparent" stroke-linecap="square"/></svg></div>'
+    res += '</div>'
+    return res
 
 def get_match_card_html(match):
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
@@ -395,16 +408,17 @@ else:
         
     for stage_code in ko_stages:
         s_matches = [m for m in all_matches if m.get("stage") == stage_code]
-        s_matches.sort(key=lambda x: x.get("utcDate") or "")
+        # 【關鍵修正】: 取消以時間排序，確保賽事維持晉級路線對位
+        s_matches.sort(key=lambda x: x.get("id", 0))
         for i, m in enumerate(s_matches):
             if not m.get("utcDate"):
                 m["utcDate"] = get_mock_date(stage_code, i)
         
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌳 淘汰賽階段看板", "🏆 淘汰賽列表", "⚽ 分組賽進度", "📊 各組積分與數據", "📡 今日與次日焦點"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌳 晉級樹狀圖", "🏆 淘汰賽列表", "⚽ 分組賽進度", "📊 各組積分與數據", "📡 今日與次日焦點"])
     
     with tab1:
-        st.subheader("🌳 淘汰賽推進階段看板")
-        st.caption("💡 提示：為避免 API 時間排序與實際樹狀圖晉級路徑衝突造成誤導，已移除固定連接線，改為清晰的「階段推進排版」。")
+        st.subheader("🌳 淘汰賽晉級樹狀圖 (依據結構排列配對)")
+        st.caption("💡 提示：樹狀圖已取消按時間排序，確保勝隊準確流向對應的下一輪賽事框，並恢復了連接線的對位引導！")
         
         r1_m = get_padded_matches(all_matches, "LAST_32", 16)
         r2_m = get_padded_matches(all_matches, "LAST_16", 8)
@@ -422,8 +436,8 @@ else:
         
         header_html = '<div style="display:flex;min-width:1000px;margin-bottom:12px;"><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">32強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">16強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">8強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">4強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#ea4335;font-size:14px;">決賽階段</div></div>'
         
-        # 移除原先的 SVG 連接線，改以純粹的間距 (div width:30px) 切分階段欄位
-        bracket_container = f'<div style="display:flex;min-width:1000px;height:1440px;">{r1_html}<div style="width:30px;"></div>{r2_html}<div style="width:30px;"></div>{r3_html}<div style="width:30px;"></div>{r4_html}<div style="width:30px;"></div>{r5_html}</div>'
+        # 重新帶入 get_svg_connector 將結構重新連線
+        bracket_container = f'<div style="display:flex;min-width:1000px;height:1440px;">{r1_html}{get_svg_connector(8, 90)}{r2_html}{get_svg_connector(4, 180)}{r3_html}{get_svg_connector(2, 360)}{r4_html}{get_svg_connector(1, 720)}{r5_html}</div>'
 
         bracket_html = f'<div style="overflow-x:auto;background-color:#f8f9fa;padding:20px;border-radius:12px;border:1px solid #eaebed;margin-top:10px;">{header_html}{bracket_container}</div>'
         
@@ -434,6 +448,8 @@ else:
         ko_matches_updated = [m for m in all_matches if m.get("stage") in ko_stages]
         for stage_code in reversed(ko_stages):
             stage_matches = [m for m in ko_matches_updated if m.get("stage") == stage_code]
+            # 【細節保留】列表模式依然依照時間排序，確保觀看順序順暢
+            stage_matches.sort(key=lambda x: x.get("utcDate") or "")
             if stage_matches:
                 with st.expander(STAGE_MAP.get(stage_code, stage_code)):
                     for m in stage_matches:
