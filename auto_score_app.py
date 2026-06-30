@@ -280,17 +280,6 @@ def get_flag_html(team_en, height=14):
         return f'<img src="{url}" style="height:{height}px; width:auto; vertical-align:middle; margin-right:4px; border-radius:2px; box-shadow:0 0 1px rgba(0,0,0,0.3);">'
     return ""
 
-def get_svg_connector(count, h):
-    svg_h = 2 * h
-    y1 = h / 2
-    y2 = y1 + h
-    y_mid = h
-    res = '<div style="display:flex;flex-direction:column;width:30px;">'
-    for _ in range(count):
-        res += f'<div style="height:{svg_h}px;display:flex;align-items:center;justify-content:center;"><svg width="30" height="{svg_h}" style="display:block;"><path d="M 0 {y1} L 15 {y1} L 15 {y2} L 0 {y2} M 15 {y_mid} L 30 {y_mid}" stroke="#bdc1c6" stroke-width="2" fill="transparent" stroke-linecap="square"/></svg></div>'
-    res += '</div>'
-    return res
-
 def get_match_card_html(match):
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
@@ -381,7 +370,7 @@ st.title("🏆 2026 世足賽即時數據觀測台")
 if st.button("🔄 強制同步最新數據", use_container_width=True):
     st.cache_data.clear()
 
-sub_tab1, sub_tab2, sub_tab3 = st.tabs(["🌳 晉級樹狀圖", "📡 今日與次日賽程", "📊 各組積分與數據"])
+sub_tab1, sub_tab2, sub_tab3 = st.tabs(["🌳 淘汰賽階段看板", "📡 今日與次日賽程", "📊 各組積分與數據"])
 
 match_res = fetch_scores()
 stand_res = fetch_standings()
@@ -406,7 +395,7 @@ if "error" not in match_res:
                 m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (支援桌機影像國旗)")
+    st.subheader("🌳 淘汰賽推進階段看板")
     
     r1_m = get_padded_matches(all_m, "LAST_32", 16)
     r2_m = get_padded_matches(all_m, "LAST_16", 8)
@@ -424,7 +413,7 @@ with sub_tab1:
     
     header_html = '<div style="display:flex;min-width:1000px;margin-bottom:12px;"><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">32強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">16強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">8強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">4強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#ea4335;font-size:14px;">決賽階段</div></div>'
     
-    bracket_container = f'<div style="display:flex;min-width:1000px;height:1440px;">{r1_html}{get_svg_connector(8, 90)}{r2_html}{get_svg_connector(4, 180)}{r3_html}{get_svg_connector(2, 360)}{r4_html}{get_svg_connector(1, 720)}{r5_html}</div>'
+    bracket_container = f'<div style="display:flex;min-width:1000px;height:1440px;">{r1_html}<div style="width:30px;"></div>{r2_html}<div style="width:30px;"></div>{r3_html}<div style="width:30px;"></div>{r4_html}<div style="width:30px;"></div>{r5_html}</div>'
 
     bracket_html = f'<div style="overflow-x:auto;background-color:#f8f9fa;padding:20px;border-radius:12px;border:1px solid #eaebed;margin-top:10px;">{header_html}{bracket_container}</div>'
     
@@ -470,7 +459,6 @@ with sub_tab3:
                     "進/失球": f"{entry.get('goalsFor')} / {entry.get('goalsAgainst')}",
                     "淨勝球(GD)": entry.get("goalDifference"), "總積分": entry.get("points")
                 })
-            # 配置 ImageColumn 讓表格也能顯示影像國旗
             st.dataframe(
                 table_rows, 
                 use_container_width=True, 
