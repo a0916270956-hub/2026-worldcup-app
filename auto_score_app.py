@@ -39,38 +39,38 @@ TEAM_TRANSLATION = {
     "Cape Verde": "維德角", "Cape Verde Islands": "維德角", "TBD": "待定"
 }
 
-# 國家國旗 Emoji 資料庫
-TEAM_FLAG = {
-    "Argentina": "🇦🇷", "France": "🇫🇷", "Croatia": "🇭🇷", "Morocco": "🇲🇦",
-    "Netherlands": "🇳🇱", "England": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Brazil": "🇧🇷", "Portugal": "🇵🇹",
-    "Japan": "🇯🇵", "Senegal": "🇸🇳", "Australia": "🇦🇺", "Switzerland": "🇨🇭",
-    "Spain": "🇪🇸", "United States": "🇺🇸", "USA": "🇺🇸", "Poland": "🇵🇱",
-    "Korea Republic": "🇰🇷", "South Korea": "🇰🇷", "Cameroon": "🇨🇲", "Uruguay": "🇺🇾",
-    "Tunisia": "🇹🇳", "Mexico": "🇲🇽", "Belgium": "🇧🇪", "Ghana": "🇬🇭",
-    "Saudi Arabia": "🇸🇦", "Iran": "🇮🇷", "Iran (Islamic Republic of)": "🇮🇷",
-    "Costa Rica": "🇨🇷", "Denmark": "🇩🇰", "Serbia": "🇷🇸", "Wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-    "Ecuador": "🇪🇨", "Qatar": "🇶🇦", "Canada": "🇨🇦", "Germany": "🇩🇪",
-    "Italy": "🇮🇹", "Chile": "🇨🇱", "Colombia": "🇨🇴", "Peru": "🇵🇪",
-    "Sweden": "🇸🇪", "Nigeria": "🇳🇬", "Egypt": "🇪🇬", "Algeria": "🇩🇿",
-    "Côte d'Ivoire": "🇨🇮", "Ivory Coast": "🇨🇮", "Mali": "🇲🇱",
-    "Burkina Faso": "🇧🇫", "South Africa": "🇿🇦", "Congo DR": "🇨🇩",
-    "DR Congo": "🇨🇩", "Bosnia and Herzegovina": "🇧🇦", "Bosnia-Herzegovina": "🇧🇦", 
-    "Czechia": "🇨🇿", "Czech Republic": "🇨🇿", "Republic of Ireland": "🇮🇪", "Ireland": "🇮🇪",
-    "Northern Ireland": "🇬🇧", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Austria": "🇦🇹", 
-    "Hungary": "🇭🇺", "Slovakia": "🇸🇰", "Paraguay": "🇵🇾", 
-    "Venezuela": "🇻🇪", "Bolivia": "🇧🇴", "New Zealand": "🇳🇿",
-    "Haiti": "🇭🇹", "Jamaica": "🇯🇲", "Honduras": "🇭🇳", "El Salvador": "🇸🇻",
-    "Panama": "🇵🇦", "Cuba": "🇨🇺", "Trinidad and Tobago": "🇹🇹",
-    "Curaçao": "🇨🇼", "Iraq": "🇮🇶", "Syria": "🇸🇾", "United Arab Emirates": "🇦🇪",
-    "Uzbekistan": "🇺🇿", "China PR": "🇨🇳", "Oman": "🇴🇲", "Bahrain": "🇧🇭",
-    "Jordan": "🇯🇴", "Lebanon": "🇱🇧", "Vietnam": "🇻🇳", "Thailand": "🇹🇭",
-    "Indonesia": "🇮🇩", "Malaysia": "🇲🇾", "India": "🇮🇳", "Türkiye": "🇹🇷",
-    "Turkey": "🇹🇷", "Greece": "🇬🇷", "Romania": "🇷🇴", "Bulgaria": "🇧🇬",
-    "Ukraine": "🇺🇦", "Russia": "🇷🇺", "Iceland": "🇮🇸", "Finland": "🇫🇮",
-    "Norway": "🇳🇴", "Slovenia": "🇸🇮", "Albania": "🇦🇱", 
-    "North Macedonia": "🇲🇰", "Georgia": "🇬🇪", "Armenia": "🇦🇲", "Israel": "🇮🇱",
-    "Cape Verde": "🇨🇻", "Cape Verde Islands": "🇨🇻", "Kosovo": "🇽🇰",
-    "Montenegro": "🇲🇪", "Guinea": "🇬🇳", "Gabon": "🇬🇦", "Benin": "🇧🇯"
+# ISO 3166-1 alpha-2 國家代碼 (對接 FlagCDN 解決 Windows 不支援 Emoji 國旗問題)
+TEAM_FLAG_CODE = {
+    "Argentina": "ar", "France": "fr", "Croatia": "hr", "Morocco": "ma",
+    "Netherlands": "nl", "England": "gb-eng", "Brazil": "br", "Portugal": "pt",
+    "Japan": "jp", "Senegal": "sn", "Australia": "au", "Switzerland": "ch",
+    "Spain": "es", "United States": "us", "USA": "us", "Poland": "pl",
+    "Korea Republic": "kr", "South Korea": "kr", "Cameroon": "cm", "Uruguay": "uy",
+    "Tunisia": "tn", "Mexico": "mx", "Belgium": "be", "Ghana": "gh",
+    "Saudi Arabia": "sa", "Iran": "ir", "Iran (Islamic Republic of)": "ir",
+    "Costa Rica": "cr", "Denmark": "dk", "Serbia": "rs", "Wales": "gb-wls",
+    "Ecuador": "ec", "Qatar": "qa", "Canada": "ca", "Germany": "de",
+    "Italy": "it", "Chile": "cl", "Colombia": "co", "Peru": "pe",
+    "Sweden": "se", "Nigeria": "ng", "Egypt": "eg", "Algeria": "dz",
+    "Côte d'Ivoire": "ci", "Ivory Coast": "ci", "Mali": "ml",
+    "Burkina Faso": "bf", "South Africa": "za", "Congo DR": "cd",
+    "DR Congo": "cd", "Bosnia and Herzegovina": "ba", "Bosnia-Herzegovina": "ba", 
+    "Czechia": "cz", "Czech Republic": "cz", "Republic of Ireland": "ie", "Ireland": "ie",
+    "Northern Ireland": "gb-nir", "Scotland": "gb-sct", "Austria": "at", 
+    "Hungary": "hu", "Slovakia": "sk", "Paraguay": "py", 
+    "Venezuela": "ve", "Bolivia": "bo", "New Zealand": "nz",
+    "Haiti": "ht", "Jamaica": "jm", "Honduras": "hn", "El Salvador": "sv",
+    "Panama": "pa", "Cuba": "cu", "Trinidad and Tobago": "tt",
+    "Curaçao": "cw", "Iraq": "iq", "Syria": "sy", "United Arab Emirates": "ae",
+    "Uzbekistan": "uz", "China PR": "cn", "Oman": "om", "Bahrain": "bh",
+    "Jordan": "jo", "Lebanon": "lb", "Vietnam": "vn", "Thailand": "th",
+    "Indonesia": "id", "Malaysia": "my", "India": "in", "Türkiye": "tr",
+    "Turkey": "tr", "Greece": "gr", "Romania": "ro", "Bulgaria": "bg",
+    "Ukraine": "ua", "Russia": "ru", "Iceland": "is", "Finland": "fi",
+    "Norway": "no", "Slovenia": "si", "Albania": "al", 
+    "North Macedonia": "mk", "Georgia": "ge", "Armenia": "am", "Israel": "il",
+    "Cape Verde": "cv", "Cape Verde Islands": "cv", "Kosovo": "xk",
+    "Montenegro": "me", "Guinea": "gn", "Gabon": "ga", "Benin": "bj"
 }
 
 TEAM_RANKING = {
@@ -268,8 +268,18 @@ def get_padded_matches(matches, stage, expected_count):
     return stage_matches[:expected_count]
 
 # ==========================================
-# 3. UI 模組：世界排名 + Emoji 國旗 + 防溢出系統
+# 3. UI 模組：圖片國旗支援與 HTML 卡片重構
 # ==========================================
+def get_flag_url(team_en):
+    code = TEAM_FLAG_CODE.get(team_en.strip())
+    return f"https://flagcdn.com/24x18/{code}.png" if code else None
+
+def get_flag_html(team_en, height=14):
+    url = get_flag_url(team_en)
+    if url:
+        return f'<img src="{url}" style="height:{height}px; width:auto; vertical-align:middle; margin-right:4px; border-radius:2px; box-shadow:0 0 1px rgba(0,0,0,0.3);">'
+    return ""
+
 def get_svg_connector(count, h):
     svg_h = 2 * h
     y1 = h / 2
@@ -289,8 +299,9 @@ def get_match_card_html(match):
 
     h_rank = TEAM_RANKING.get(home_en.strip(), "") if is_real_team(home_en) else ""
     a_rank = TEAM_RANKING.get(away_en.strip(), "") if is_real_team(away_en) else ""
-    h_flag = TEAM_FLAG.get(home_en.strip(), "🏳️") + " " if is_real_team(home_en) else ""
-    a_flag = TEAM_FLAG.get(away_en.strip(), "🏳️") + " " if is_real_team(away_en) else ""
+    
+    h_flag = get_flag_html(home_en, height=12) if is_real_team(home_en) else ""
+    a_flag = get_flag_html(away_en, height=12) if is_real_team(away_en) else ""
     
     h_display = f"{h_flag}{home} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{h_rank}</span>" if h_rank else f"{h_flag}{home}"
     a_display = f"{a_flag}{away} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{a_rank}</span>" if a_rank else f"{a_flag}{away}"
@@ -314,6 +325,7 @@ def build_col(matches, cell_height):
     return res
 
 def display_match_item(match):
+    """採用 Flexbox 的客製化精緻賽程卡，取代 st.metric，解決排版與字體國旗問題"""
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
     home = TEAM_TRANSLATION.get(home_en.strip(), home_en)
@@ -321,31 +333,44 @@ def display_match_item(match):
     
     h_rank = TEAM_RANKING.get(home_en.strip(), "") if is_real_team(home_en) else ""
     a_rank = TEAM_RANKING.get(away_en.strip(), "") if is_real_team(away_en) else ""
-    h_flag = TEAM_FLAG.get(home_en.strip(), "🏳️") + " " if is_real_team(home_en) else ""
-    a_flag = TEAM_FLAG.get(away_en.strip(), "🏳️") + " " if is_real_team(away_en) else ""
+    h_flag = get_flag_html(home_en, height=16) if is_real_team(home_en) else ""
+    a_flag = get_flag_html(away_en, height=16) if is_real_team(away_en) else ""
     
-    h_rank_str = f" (#{h_rank})" if h_rank else ""
-    a_rank_str = f" (#{a_rank})" if a_rank else ""
+    h_rank_str = f" <span style='font-size:12px; font-weight:normal; color:#9aa0a6;'>#{h_rank}</span>" if h_rank else ""
+    a_rank_str = f" <span style='font-size:12px; font-weight:normal; color:#9aa0a6;'>#{a_rank}</span>" if a_rank else ""
     
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
-    h_score = full_time.get("home")
-    a_score = full_time.get("away")
+    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
+    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
+    
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
-    time_str = tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定"
     
-    st.markdown("---")
-    st.markdown(f"### 🏟️ {h_flag}{home}{h_rank_str} 🆚 {a_flag}{away}{a_rank_str} <span style='font-size: 14px; color: gray; margin-left:10px;'>({time_str} 開踢)</span>", unsafe_allow_html=True)
+    time_display = tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定"
     
-    h_display = "-" if h_score is None else h_score
-    a_display = "-" if a_score is None else a_score
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric(label=f"{h_flag}{home}{h_rank_str}", value=h_display)
-    c2.metric(label="賽事狀態", value=status_text)
-    c3.metric(label=f"{a_flag}{away}{a_rank_str}", value=a_display)
+    card_html = f"""
+    <div style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; padding:12px 10px; border-radius:8px; margin-bottom:12px; border:1px solid #eaebed; box-shadow:0 1px 2px rgba(0,0,0,0.05); font-family:sans-serif;">
+        <div style="flex:1; text-align:center; min-width:0;">
+            <div style="font-size:14px; font-weight:bold; color:#202124; margin-bottom:4px; display:flex; justify-content:center; align-items:center; flex-wrap:wrap;">
+                {h_flag}<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{home}</span>{h_rank_str}
+            </div>
+            <div style="font-size:26px; font-weight:bold; color:#202124;">{h_score}</div>
+        </div>
+        <div style="width:85px; text-align:center; border-left:1px solid #f1f3f4; border-right:1px solid #f1f3f4; padding:0 5px; flex-shrink:0;">
+            <div style="font-size:12px; color:#70757a; margin-bottom:6px; white-space:nowrap;">{time_display} 開踢</div>
+            <div style="font-size:13px; font-weight:bold; color:#1a73e8; background:#e8f0fe; padding:3px 6px; border-radius:4px; display:inline-block; white-space:nowrap;">{status_text}</div>
+        </div>
+        <div style="flex:1; text-align:center; min-width:0;">
+            <div style="font-size:14px; font-weight:bold; color:#202124; margin-bottom:4px; display:flex; justify-content:center; align-items:center; flex-wrap:wrap;">
+                {a_flag}<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{away}</span>{a_rank_str}
+            </div>
+            <div style="font-size:26px; font-weight:bold; color:#202124;">{a_score}</div>
+        </div>
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
 
 # ==========================================
 # 3. 網頁介面
@@ -381,7 +406,7 @@ if "error" not in match_res:
                 m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (附帶國旗與世界排名)")
+    st.subheader("🌳 淘汰賽晉級樹狀圖 (支援桌機影像國旗)")
     
     r1_m = get_padded_matches(all_m, "LAST_32", 16)
     r2_m = get_padded_matches(all_m, "LAST_16", 8)
@@ -437,12 +462,18 @@ with sub_tab3:
             for entry in group_data.get("table", []):
                 team_en = entry.get("team", {}).get("name") or "TBD"
                 team_zh = TEAM_TRANSLATION.get(team_en.strip(), team_en)
-                t_flag = TEAM_FLAG.get(team_en.strip(), "🏳️") + " " if is_real_team(team_en) else ""
+                flag_url = get_flag_url(team_en) if is_real_team(team_en) else None
                 
                 table_rows.append({
-                    "排名": entry.get("position"), "球隊": f"{t_flag}{team_zh}", "已賽": entry.get("playedGames"),
+                    "排名": entry.get("position"), "國旗": flag_url, "球隊": team_zh, "已賽": entry.get("playedGames"),
                     "勝": entry.get("won"), "和": entry.get("draw"), "敗": entry.get("lost"),
                     "進/失球": f"{entry.get('goalsFor')} / {entry.get('goalsAgainst')}",
                     "淨勝球(GD)": entry.get("goalDifference"), "總積分": entry.get("points")
                 })
-            st.dataframe(table_rows, use_container_width=True, hide_index=True)
+            # 配置 ImageColumn 讓表格也能顯示影像國旗
+            st.dataframe(
+                table_rows, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={"國旗": st.column_config.ImageColumn("國旗", help="國家國旗")}
+            )
