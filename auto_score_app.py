@@ -113,16 +113,8 @@ def is_real_team(team_name):
     fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "MATCH", "1ST", "2ND", "3RD", "晉級", "首名", "次名", "第三名", "勝者", "敗者", "UNKNOWN"]
     return not any(kw in str(team_name).upper() for kw in fake_keywords)
 
-def get_real_teams(match):
-    h = match.get("homeTeam", {}).get("name")
-    a = match.get("awayTeam", {}).get("name")
-    res = []
-    if is_real_team(h): res.append(h)
-    if is_real_team(a): res.append(a)
-    return res
-
 # ==========================================
-# 2. 核心數據抓取與正向拓樸配對演算法
+# 2. 核心數據抓取與智慧雙軌配對
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores():
@@ -270,13 +262,12 @@ def get_padded_matches(matches, stage, expected_count):
             "status": "SCHEDULED",
             "utcDate": get_mock_date(stage, idx),
             "homeTeam": {"name": "待定"}, 
-            "awayTeam": {"name": "待定"}
+            "awayTeam": {"name": "待定"},
+            "score": {"fullTime": {"home": None, "away": None}}
         })
     return stage_matches[:expected_count]
 
-# --- 核心更新：絕對路徑正向配對法 (Forward Structural Mapping) ---
 def sort_r1_by_layout(matches):
-    """嚴格將 32 強鎖死在標準位置"""
     bracket_layout = [
         {"Germany", "德國", "Paraguay", "巴拉圭"},
         {"France", "法國", "Sweden", "瑞典"},
@@ -307,49 +298,54 @@ def sort_r1_by_layout(matches):
     return sorted(matches, key=get_idx)
 
 def sort_subsequent_stage(prev_stage_matches, current_stage_matches):
-    """強迫下一輪跟隨上一輪的正向排列，確保連線歸位"""
-    sorted_current = []
-    used = set()
-    for i in range(0, len(prev_stage_matches), 2):
-        if i+1 >= len(prev_stage_matches): break
+    slots_count = len(prev_stage_matches) // 2
+    slot_matches = [None] * slots_count
+    used_ids = set()
+    
+    for slot_idx in range(slots_count):
+        i = slot_idx * 2
         feeder_1 = prev_stage_matches[i]
         feeder_2 = prev_stage_matches[i+1]
         
-        possible_teams = {
-            feeder_1.get("homeTeam", {}).get("name", ""),
-            feeder_1.get("awayTeam", {}).get("name", ""),
-            feeder_2.get("homeTeam", {}).get("name", ""),
-            feeder_2.get("awayTeam", {}).get("name", "")
-        }
-        
-        match_found = None
+        possible_teams = set()
+        for m in [feeder_1, feeder_2]:
+            h = m.get("homeTeam", {}).get("name", "")
+            a = m.get("awayTeam", {}).get("name", "")
+            if is_real_team(h): possible_teams.add(h)
+            if is_real_team(a): possible_teams.add(a)
+            
         for m in current_stage_matches:
-            if id(m) in used: continue
+            if id(m) in used_ids: continue
             m_h = m.get("homeTeam", {}).get("name", "")
             m_a = m.get("awayTeam", {}).get("name", "")
-            if (is_real_team(m_h) and m_h in possible_teams) or (is_real_team(m_a) and m_a in possible_teams):
-                match_found = m
+            if (m_h and m_h in possible_teams) or (m_a and m_a in possible_teams):
+                slot_matches[slot_idx] = m
+                used_ids.add(id(m))
                 break
                 
-        if match_found:
-            sorted_current.append(match_found)
-            used.add(id(match_found))
-        else:
+    for slot_idx in range(slots_count):
+        if slot_matches[slot_idx] is None:
             for m in current_stage_matches:
-                if id(m) not in used:
-                    sorted_current.append(m)
-                    used.add(id(m))
+                if id(m) not in used_ids:
+                    slot_matches[slot_idx] = m
+                    used_ids.add(id(m))
                     break
                     
-    for m in current_stage_matches:
-        if id(m) not in used:
-            sorted_current.append(m)
-            used.add(id(m))
-            
-    return sorted_current
+    final_matches = []
+    for m in slot_matches:
+        if m is not None:
+            final_matches.append(m)
+        else:
+            final_matches.append({
+                "status": "SCHEDULED",
+                "homeTeam": {"name": "待定"},
+                "awayTeam": {"name": "待定"},
+                "score": {"fullTime": {"home": None, "away": None}}
+            })
+    return final_matches
 
 # ==========================================
-# 3. UI 模組：圖片國旗支援與 HTML 卡片重構
+# 3. UI 模組
 # ==========================================
 def get_flag_url(team_en):
     code = TEAM_FLAG_CODE.get(team_en.strip())
@@ -372,6 +368,14 @@ def get_svg_connector(count, h):
     res += '</div>'
     return res
 
+def parse_display_score(full_time_score, penalties_score):
+    if full_time_score is None:
+        return "-"
+    base = str(full_time_score)
+    if penalties_score is not None:
+        return f"{base} ({penalties_score})"
+    return base
+
 def get_match_card_html(match):
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
     away_en = match.get("awayTeam", {}).get("name") or "TBD"
@@ -389,8 +393,10 @@ def get_match_card_html(match):
 
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
-    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
-    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
+    penalties = score_obj.get("penalties", {}) or {}
+    
+    h_score = parse_display_score(full_time.get("home"), penalties.get("home"))
+    a_score = parse_display_score(full_time.get("away"), penalties.get("away"))
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
@@ -421,8 +427,10 @@ def display_match_item(match):
     
     score_obj = match.get("score", {}) or {}
     full_time = score_obj.get("fullTime", {}) or {}
-    h_score = full_time.get("home") if full_time.get("home") is not None else "-"
-    a_score = full_time.get("away") if full_time.get("away") is not None else "-"
+    penalties = score_obj.get("penalties", {}) or {}
+    
+    h_score = parse_display_score(full_time.get("home"), penalties.get("home"))
+    a_score = parse_display_score(full_time.get("away"), penalties.get("away"))
     
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
@@ -486,9 +494,8 @@ if "error" not in match_res:
                 m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (HK01 標準籤表正向對位)")
+    st.subheader("🌳 淘汰賽晉級樹狀圖 (雙軌結構鎖定版)")
     
-    # 完全重組的 100% 精準配對
     r1_m = sort_r1_by_layout(get_padded_matches(all_m, "LAST_32", 16))
     r2_m = sort_subsequent_stage(r1_m, get_padded_matches(all_m, "LAST_16", 8))
     r3_m = sort_subsequent_stage(r2_m, get_padded_matches(all_m, "QUARTER_FINALS", 4))
