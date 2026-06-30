@@ -25,7 +25,7 @@ TEAM_TRANSLATION = {
     "Czechia": "捷克", "Czech Republic": "捷克", "Republic of Ireland": "愛爾蘭", 
     "Northern Ireland": "北愛爾蘭", "Scotland": "蘇格蘭", "Austria": "奧地利", 
     "Hungary": "匈牙利", "Slovakia": "斯洛伐克", "Paraguay": "巴拉圭", 
-    "Venezuela": "委延內瑞拉", "Bolivia": "玻利維亞", "New Zealand": "紐西蘭",
+    "Venezuela": "委內瑞拉", "Bolivia": "玻利維亞", "New Zealand": "紐西蘭",
     "Haiti": "海地", "Jamaica": "牙買加", "Honduras": "宏都拉斯", "El Salvador": "薩爾瓦多",
     "Panama": "巴拿馬", "Cuba": "古巴", "Trinidad and Tobago": "千里達及托巴哥",
     "Curaçao": "古拉索", "Iraq": "伊拉克", "Syria": "敘利亞", "United Arab Emirates": "阿聯酋",
@@ -368,33 +368,31 @@ def get_svg_connector(count, h):
     res += '</div>'
     return res
 
-def parse_display_score(score_obj, team_type):
+def get_display_scores(score_obj):
     if not score_obj:
-        return "-"
+        return "-", "-"
         
-    full_time = score_obj.get("fullTime", {}) or {}
-    regular_time = score_obj.get("regularTime", {}) or {}
-    extra_time = score_obj.get("extraTime", {}) or {}
-    penalties = score_obj.get("penalties", {}) or {}
+    ft_h = score_obj.get("fullTime", {}).get("home")
+    ft_a = score_obj.get("fullTime", {}).get("away")
+    p_h = score_obj.get("penalties", {}).get("home")
+    p_a = score_obj.get("penalties", {}).get("away")
     
-    f_val = full_time.get(team_type)
-    r_val = regular_time.get(team_type)
-    e_val = extra_time.get(team_type)
-    p_val = penalties.get(team_type)
-    
-    if f_val is not None:
-        base = str(f_val)
-    elif r_val is not None:
-        if e_val is not None:
-            base = str(int(r_val) + int(e_val))
-        else:
-            base = str(r_val)
-    else:
-        return "-"
+    if ft_h is None or ft_a is None:
+        return "-", "-"
         
-    if p_val is not None:
-        return f"{base} ({p_val})"
-    return base
+    h_base, a_base = int(ft_h), int(ft_a)
+    
+    if p_h is not None and p_a is not None:
+        p_h_int, p_a_int = int(p_h), int(p_a)
+        # 數學邏輯推演：PK 戰前提是雙方總分必相等。若 fullTime 含 PK 分數，則各自扣除後必相等。
+        if h_base >= p_h_int and a_base >= p_a_int:
+            if (h_base - p_h_int) == (a_base - p_a_int):
+                h_base -= p_h_int
+                a_base -= p_a_int
+                
+        return f"{h_base} ({p_h_int})", f"{a_base} ({p_a_int})"
+        
+    return str(h_base), str(a_base)
 
 def get_match_card_html(match):
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
@@ -412,8 +410,7 @@ def get_match_card_html(match):
     a_display = f"{a_flag}{away} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{a_rank}</span>" if a_rank else f"{a_flag}{away}"
 
     score_obj = match.get("score", {}) or {}
-    h_score = parse_display_score(score_obj, "home")
-    a_score = parse_display_score(score_obj, "away")
+    h_score, a_score = get_display_scores(score_obj)
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
@@ -443,8 +440,7 @@ def display_match_item(match):
     a_rank_str = f" <span style='font-size:12px; font-weight:normal; color:#9aa0a6;'>#{a_rank}</span>" if a_rank else ""
     
     score_obj = match.get("score", {}) or {}
-    h_score = parse_display_score(score_obj, "home")
-    a_score = parse_display_score(score_obj, "away")
+    h_score, a_score = get_display_scores(score_obj)
     
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
