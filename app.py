@@ -351,7 +351,7 @@ def sort_subsequent_stage(prev_stage_matches, current_stage_matches):
     return final_matches
 
 # ==========================================
-# 3. UI 模組：核心高精準比分解析器
+# 3. UI 模組：核心高精準雙層比分解析器
 # ==========================================
 def get_flag_url(team_en):
     code = TEAM_FLAG_CODE.get(team_en.strip())
@@ -374,39 +374,38 @@ def get_svg_connector(count, h):
     res += '</div>'
     return res
 
-def parse_display_score(score_obj, team_type):
+def get_display_scores(score_obj):
     """
-    多層級權核比分解析器 (Hierarchical Score Parser)
-    完美相容 API 完賽、進行中、加時賽與十二碼點球大戰的數據階層。
+    數學邏輯推演校正器：全自動分離並還原被 API 混入總分的 PK 分數。
     """
     if not score_obj:
-        return "-"
+        return "-", "-"
         
-    full_time = score_obj.get("fullTime", {}) or {}
-    regular_time = score_obj.get("regularTime", {}) or {}
-    extra_time = score_obj.get("extraTime", {}) or {}
-    penalties = score_obj.get("penalties", {}) or {}
+    ft_h = score_obj.get("fullTime", {}).get("home")
+    ft_a = score_obj.get("fullTime", {}).get("away")
+    p_h = score_obj.get("penalties", {}).get("home")
+    p_a = score_obj.get("penalties", {}).get("away")
     
-    f_val = full_time.get(team_type)
-    r_val = regular_time.get(team_type)
-    e_val = extra_time.get(team_type)
-    p_val = penalties.get(team_type)
-    
-    # 常規賽/延長賽核心判斷
-    if f_val is not None:
-        base = str(f_val)
-    elif r_val is not None:
-        if e_val is not None:
-            base = str(int(r_val) + int(e_val))
-        else:
-            base = str(r_val)
-    else:
-        return "-"
+    if ft_h is None or ft_a is None:
+        return "-", "-"
         
-    # PK 大戰獨立括號標示
-    if p_val is not None:
-        return f"{base} ({p_val})"
-    return base
+    h_base, a_base = int(ft_h), int(ft_a)
+    
+    # 只要存在 PK 點球大戰的數據
+    if p_h is not None and p_a is not None:
+        p_h_int, p_a_int = int(p_h), int(p_a)
+        
+        # 檢測 API 的 fullTime 是否已將 PK 算入總分
+        # 邏輯核心：進入 PK 戰的前提是常規賽雙方必定平手。
+        # 因此，若 (主隊總分 - 主隊PK) == (客隊總分 - 客隊PK)，代表 fullTime 已被汙染，必須強制扣除。
+        if h_base >= p_h_int and a_base >= p_a_int:
+            if (h_base - p_h_int) == (a_base - p_a_int):
+                h_base -= p_h_int
+                a_base -= p_a_int
+                
+        return f"{h_base} ({p_h_int})", f"{a_base} ({p_a_int})"
+        
+    return str(h_base), str(a_base)
 
 def get_match_card_html(match):
     home_en = match.get("homeTeam", {}).get("name") or "TBD"
@@ -424,8 +423,7 @@ def get_match_card_html(match):
     a_display = f"{a_flag}{away} <span style='color:#9aa0a6;font-size:11px;margin-left:4px;'>#{a_rank}</span>" if a_rank else f"{a_flag}{away}"
 
     score_obj = match.get("score", {}) or {}
-    h_score = parse_display_score(score_obj, "home")
-    a_score = parse_display_score(score_obj, "away")
+    h_score, a_score = get_display_scores(score_obj)
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
@@ -455,8 +453,7 @@ def display_match_item(match, display_date=True):
     a_rank_str = f" <span style='font-size:12px; font-weight:normal; color:#9aa0a6;'>#{a_rank}</span>" if a_rank else ""
     
     score_obj = match.get("score", {}) or {}
-    h_score = parse_display_score(score_obj, "home")
-    a_score = parse_display_score(score_obj, "away")
+    h_score, a_score = get_display_scores(score_obj)
     
     status_raw = match.get("status", "UNKNOWN")
     status_text = STATUS_MAP.get(status_raw, status_raw)
@@ -491,7 +488,7 @@ def display_match_item(match, display_date=True):
 # ==========================================
 st.set_page_config(page_title="2026世足動態全功能看板", page_icon="🏆", layout="wide")
 
-st.title("🏆 2026 世足賽 dynamic 看板")
+st.title("🏆 2026 世足賽動態看板")
 
 if st.button("🔄 立即刷新、同步最新數據", use_container_width=True):
     st.cache_data.clear()
@@ -524,7 +521,7 @@ else:
     
     with tab1:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (雙軌結構鎖定版)")
-        st.caption("💡 提示：已全面啟用結構性雙軌對位！已賽出隊伍（如巴西）將完美鎖定在其專屬的晉級分支內，且 PK 戰分數已成功以括號分離統計。")
+        st.caption("💡 提示：已全面啟用結構性雙軌對位與高階比分還原演算法！PK 戰分數將完全獨立顯示，絕不與常規賽混淆。")
         
         r1_m = sort_r1_by_layout(get_padded_matches(all_matches, "LAST_32", 16))
         r2_m = sort_subsequent_stage(r1_m, get_padded_matches(all_matches, "LAST_16", 8))
