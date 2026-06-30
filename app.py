@@ -115,7 +115,7 @@ GROUP_MAP = {
 }
 
 # ==========================================
-# 2. 核心數據抓取與動態智慧排序
+# 2. 核心數據與正向拓樸配對演算法
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_all_matches():
@@ -154,15 +154,6 @@ def is_real_team(team_name):
     if not team_name: return False
     fake_keywords = ["TBD", "待定", "WINNER", "LOSER", "GROUP", "MATCH", "1ST", "2ND", "3RD", "晉級", "首名", "次名", "第三名", "勝者", "敗者", "UNKNOWN"]
     return not any(kw in str(team_name).upper() for kw in fake_keywords)
-
-def get_real_teams(match):
-    """提取比賽中的真實隊伍名稱，用於溯源連線"""
-    h = match.get("homeTeam", {}).get("name")
-    a = match.get("awayTeam", {}).get("name")
-    res = []
-    if is_real_team(h): res.append(h)
-    if is_real_team(a): res.append(a)
-    return res
 
 def get_group_team(standings_data, group_letter, pos, fallback):
     if not standings_data: return fallback
@@ -269,7 +260,6 @@ def get_mock_knockout_matches(standings_data):
 
 def get_padded_matches(matches, stage, expected_count):
     stage_matches = [m for m in matches if m.get("stage") == stage]
-    # 保留時間穩定性作為初次排序基底
     stage_matches.sort(key=lambda x: x.get("utcDate") or "")
     while len(stage_matches) < expected_count:
         idx = len(stage_matches)
@@ -282,65 +272,79 @@ def get_padded_matches(matches, stage, expected_count):
         })
     return stage_matches[:expected_count]
 
-def sort_matches_for_bracket(current_matches, next_matches):
-    """
-    逆向溯源配對法 (Reverse Topological Bracket Sort)
-    解決 API 亂排導致巴西等隊伍連接線交錯的致命問題。
-    它會強迫 32 強的勝方框，乖乖地排在 16 強該隊伍出現的框旁邊，絕不會連錯！
-    """
-    if not next_matches:
-        return current_matches
+# --- 核心更新：絕對路徑正向配對法 (Forward Structural Mapping) ---
+def sort_r1_by_layout(matches):
+    """嚴格將 32 強鎖死在您截圖對應的標準位置，無論開踢時間為何"""
+    bracket_layout = [
+        {"Germany", "德國", "Paraguay", "巴拉圭"},
+        {"France", "法國", "Sweden", "瑞典"},
+        {"South Africa", "南非", "Canada", "加拿大"},
+        {"Netherlands", "荷蘭", "Morocco", "摩洛哥"},
+        {"Portugal", "葡萄牙", "Croatia", "克羅埃西亞"},
+        {"Spain", "西班牙", "Austria", "奧地利"},
+        {"United States", "USA", "美國", "Bosnia and Herzegovina", "波赫", "Bosnia-Herzegovina"},
+        {"Belgium", "比利時", "Senegal", "塞內加爾"},
+        {"Brazil", "巴西", "Japan", "日本"},
+        {"Côte d'Ivoire", "Ivory Coast", "象牙海岸", "Norway", "挪威"},
+        {"Mexico", "墨西哥", "Ecuador", "厄瓜多"},
+        {"England", "英格蘭", "Congo DR", "DR Congo", "剛果民主共和國"},
+        {"Argentina", "阿根廷", "Cape Verde", "維德角", "Cape Verde Islands"},
+        {"Australia", "澳大利亞", "Egypt", "埃及"},
+        {"Switzerland", "瑞士", "Algeria", "阿爾及利亞"},
+        {"Colombia", "哥倫比亞", "Ghana", "迦納"}
+    ]
     
-    sorted_matches = []
-    used_ids = set()
+    def get_idx(m):
+        h = m.get("homeTeam", {}).get("name", "")
+        a = m.get("awayTeam", {}).get("name", "")
+        for idx, expected in enumerate(bracket_layout):
+            if h in expected or a in expected:
+                return idx
+        return 999
     
-    for nm in next_matches:
-        h_team = nm.get("homeTeam", {}).get("name")
-        a_team = nm.get("awayTeam", {}).get("name")
+    return sorted(matches, key=get_idx)
+
+def sort_subsequent_stage(prev_stage_matches, current_stage_matches):
+    """強迫 16 強、8 強依照上一輪的分組順序正向排列，確保連接線 100% 完美對齊"""
+    sorted_current = []
+    used = set()
+    for i in range(0, len(prev_stage_matches), 2):
+        if i+1 >= len(prev_stage_matches): break
+        feeder_1 = prev_stage_matches[i]
+        feeder_2 = prev_stage_matches[i+1]
         
-        h_feeder = None
-        a_feeder = None
+        possible_teams = {
+            feeder_1.get("homeTeam", {}).get("name", ""),
+            feeder_1.get("awayTeam", {}).get("name", ""),
+            feeder_2.get("homeTeam", {}).get("name", ""),
+            feeder_2.get("awayTeam", {}).get("name", "")
+        }
         
-        # 尋找產生主場球隊的前一輪賽事
-        if is_real_team(h_team):
-            for cm in current_matches:
-                if id(cm) not in used_ids and h_team in get_real_teams(cm):
-                    h_feeder = cm
-                    used_ids.add(id(cm))
-                    break
-        
-        # 尋找產生客場球隊的前一輪賽事
-        if is_real_team(a_team):
-            for cm in current_matches:
-                if id(cm) not in used_ids and a_team in get_real_teams(cm):
-                    a_feeder = cm
-                    used_ids.add(id(cm))
+        match_found = None
+        for m in current_stage_matches:
+            if id(m) in used: continue
+            m_h = m.get("homeTeam", {}).get("name", "")
+            m_a = m.get("awayTeam", {}).get("name", "")
+            if (is_real_team(m_h) and m_h in possible_teams) or (is_real_team(m_a) and m_a in possible_teams):
+                match_found = m
+                break
+                
+        if match_found:
+            sorted_current.append(match_found)
+            used.add(id(match_found))
+        else:
+            for m in current_stage_matches:
+                if id(m) not in used:
+                    sorted_current.append(m)
+                    used.add(id(m))
                     break
                     
-        # 針對尚未產生的球隊(TBD)，用剩餘比賽順序填補空白
-        if not h_feeder:
-            for cm in current_matches:
-                if id(cm) not in used_ids:
-                    h_feeder = cm
-                    used_ids.add(id(cm))
-                    break
-        if not a_feeder:
-            for cm in current_matches:
-                if id(cm) not in used_ids:
-                    a_feeder = cm
-                    used_ids.add(id(cm))
-                    break
-        
-        if h_feeder: sorted_matches.append(h_feeder)
-        if a_feeder: sorted_matches.append(a_feeder)
-        
-    # 保底：若有遺漏強制補上，避免破版
-    for cm in current_matches:
-        if id(cm) not in used_ids:
-            sorted_matches.append(cm)
-            used_ids.add(id(cm))
+    for m in current_stage_matches:
+        if id(m) not in used:
+            sorted_current.append(m)
+            used.add(id(m))
             
-    return sorted_matches
+    return sorted_current
 
 # ==========================================
 # 3. UI 模組：圖片國旗支援與 HTML 卡片重構
@@ -356,7 +360,6 @@ def get_flag_html(team_en, height=14):
     return ""
 
 def get_svg_connector(count, h):
-    """繪製連接線"""
     svg_h = 2 * h
     y1 = h / 2
     y2 = y1 + h
@@ -476,7 +479,7 @@ else:
         
     for stage_code in ko_stages:
         s_matches = [m for m in all_matches if m.get("stage") == stage_code]
-        # 此處時間排序僅為基底，後續樹狀圖會由演算法接管
+        # 此處的時間排序只是初次基底，樹狀圖區塊會由下方強制定序
         s_matches.sort(key=lambda x: x.get("utcDate") or "")
         for i, m in enumerate(s_matches):
             if not m.get("utcDate"):
@@ -485,17 +488,16 @@ else:
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌳 晉級樹狀圖", "🏆 淘汰賽列表", "⚽ 分組賽進度", "📊 各組積分與數據", "📡 今日與次日焦點"])
     
     with tab1:
-        st.subheader("🌳 淘汰賽晉級樹狀圖 (嚴格拓樸配對版)")
-        st.caption("💡 提示：已全面啟用逆向拓樸溯源排序！所有連接線與下一輪對手皆會無死角對齊，解決巴西誤植等交錯跑位狀況。")
+        st.subheader("🌳 淘汰賽晉級樹狀圖 (HK01 標準籤表正向對位)")
+        st.caption("💡 提示：已啟動絕對路徑正向配對法，32 強籤表完全鎖死，勝方連線 100% 絕對歸位，絕無交錯！")
         
-        # 核心：由冠軍戰往 32 強逆推，強迫子賽事與父賽事對齊
-        r5_m = get_padded_matches(all_matches, "FINAL", 1)
-        r4_m = sort_matches_for_bracket(get_padded_matches(all_matches, "SEMI_FINALS", 2), r5_m)
-        r3_m = sort_matches_for_bracket(get_padded_matches(all_matches, "QUARTER_FINALS", 4), r4_m)
-        r2_m = sort_matches_for_bracket(get_padded_matches(all_matches, "LAST_16", 8), r3_m)
-        r1_m = sort_matches_for_bracket(get_padded_matches(all_matches, "LAST_32", 16), r2_m)
+        # 關鍵重組：32強強制對位，16、8、4強強制繼承上一輪路徑
+        r1_m = sort_r1_by_layout(get_padded_matches(all_matches, "LAST_32", 16))
+        r2_m = sort_subsequent_stage(r1_m, get_padded_matches(all_matches, "LAST_16", 8))
+        r3_m = sort_subsequent_stage(r2_m, get_padded_matches(all_matches, "QUARTER_FINALS", 4))
+        r4_m = sort_subsequent_stage(r3_m, get_padded_matches(all_matches, "SEMI_FINALS", 2))
         
-        r5_f = r5_m[0]
+        r5_f = get_padded_matches(all_matches, "FINAL", 1)[0]
         r5_t = get_padded_matches(all_matches, "THIRD_PLACE", 1)[0]
 
         r1_html = build_col(r1_m, 90)
@@ -507,7 +509,7 @@ else:
         
         header_html = '<div style="display:flex;min-width:1000px;margin-bottom:12px;"><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">32強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">16強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">8強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#5f6368;font-size:14px;">4強賽</div><div style="width:30px;"></div><div style="width:170px;text-align:center;font-weight:bold;color:#ea4335;font-size:14px;">決賽階段</div></div>'
         
-        # 繪製已對準的連接線
+        # 連接線完美繪出
         bracket_container = f'<div style="display:flex;min-width:1000px;height:1440px;">{r1_html}{get_svg_connector(8, 90)}{r2_html}{get_svg_connector(4, 180)}{r3_html}{get_svg_connector(2, 360)}{r4_html}{get_svg_connector(1, 720)}{r5_html}</div>'
 
         bracket_html = f'<div style="overflow-x:auto;background-color:#f8f9fa;padding:20px;border-radius:12px;border:1px solid #eaebed;margin-top:10px;">{header_html}{bracket_container}</div>'
@@ -519,7 +521,7 @@ else:
         ko_matches_updated = [m for m in all_matches if m.get("stage") in ko_stages]
         for stage_code in reversed(ko_stages):
             stage_matches = [m for m in ko_matches_updated if m.get("stage") == stage_code]
-            # 列表模式不受樹狀圖約束，依時間排序最直觀
+            # 列表模式保留「時間順序」，方便觀看賽事順序
             stage_matches.sort(key=lambda x: x.get("utcDate") or "")
             if stage_matches:
                 with st.expander(STAGE_MAP.get(stage_code, stage_code)):
