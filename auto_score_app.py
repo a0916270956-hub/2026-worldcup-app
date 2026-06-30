@@ -122,7 +122,7 @@ def get_real_teams(match):
     return res
 
 # ==========================================
-# 2. 核心數據抓取與智慧預填
+# 2. 核心數據抓取與正向拓樸配對演算法
 # ==========================================
 @st.cache_data(ttl=60)
 def fetch_scores():
@@ -274,56 +274,79 @@ def get_padded_matches(matches, stage, expected_count):
         })
     return stage_matches[:expected_count]
 
-def sort_matches_for_bracket(current_matches, next_matches):
-    if not next_matches:
-        return current_matches
+# --- 核心更新：絕對路徑正向配對法 (Forward Structural Mapping) ---
+def sort_r1_by_layout(matches):
+    """嚴格將 32 強鎖死在標準位置"""
+    bracket_layout = [
+        {"Germany", "德國", "Paraguay", "巴拉圭"},
+        {"France", "法國", "Sweden", "瑞典"},
+        {"South Africa", "南非", "Canada", "加拿大"},
+        {"Netherlands", "荷蘭", "Morocco", "摩洛哥"},
+        {"Portugal", "葡萄牙", "Croatia", "克羅埃西亞"},
+        {"Spain", "西班牙", "Austria", "奧地利"},
+        {"United States", "USA", "美國", "Bosnia and Herzegovina", "波赫", "Bosnia-Herzegovina"},
+        {"Belgium", "比利時", "Senegal", "塞內加爾"},
+        {"Brazil", "巴西", "Japan", "日本"},
+        {"Côte d'Ivoire", "Ivory Coast", "象牙海岸", "Norway", "挪威"},
+        {"Mexico", "墨西哥", "Ecuador", "厄瓜多"},
+        {"England", "英格蘭", "Congo DR", "DR Congo", "剛果民主共和國"},
+        {"Argentina", "阿根廷", "Cape Verde", "維德角", "Cape Verde Islands"},
+        {"Australia", "澳大利亞", "Egypt", "埃及"},
+        {"Switzerland", "瑞士", "Algeria", "阿爾及利亞"},
+        {"Colombia", "哥倫比亞", "Ghana", "迦納"}
+    ]
     
-    sorted_matches = []
-    used_ids = set()
+    def get_idx(m):
+        h = m.get("homeTeam", {}).get("name", "")
+        a = m.get("awayTeam", {}).get("name", "")
+        for idx, expected in enumerate(bracket_layout):
+            if h in expected or a in expected:
+                return idx
+        return 999
     
-    for nm in next_matches:
-        h_team = nm.get("homeTeam", {}).get("name")
-        a_team = nm.get("awayTeam", {}).get("name")
+    return sorted(matches, key=get_idx)
+
+def sort_subsequent_stage(prev_stage_matches, current_stage_matches):
+    """強迫下一輪跟隨上一輪的正向排列，確保連線歸位"""
+    sorted_current = []
+    used = set()
+    for i in range(0, len(prev_stage_matches), 2):
+        if i+1 >= len(prev_stage_matches): break
+        feeder_1 = prev_stage_matches[i]
+        feeder_2 = prev_stage_matches[i+1]
         
-        h_feeder = None
-        a_feeder = None
+        possible_teams = {
+            feeder_1.get("homeTeam", {}).get("name", ""),
+            feeder_1.get("awayTeam", {}).get("name", ""),
+            feeder_2.get("homeTeam", {}).get("name", ""),
+            feeder_2.get("awayTeam", {}).get("name", "")
+        }
         
-        if is_real_team(h_team):
-            for cm in current_matches:
-                if id(cm) not in used_ids and h_team in get_real_teams(cm):
-                    h_feeder = cm
-                    used_ids.add(id(cm))
-                    break
-        
-        if is_real_team(a_team):
-            for cm in current_matches:
-                if id(cm) not in used_ids and a_team in get_real_teams(cm):
-                    a_feeder = cm
-                    used_ids.add(id(cm))
+        match_found = None
+        for m in current_stage_matches:
+            if id(m) in used: continue
+            m_h = m.get("homeTeam", {}).get("name", "")
+            m_a = m.get("awayTeam", {}).get("name", "")
+            if (is_real_team(m_h) and m_h in possible_teams) or (is_real_team(m_a) and m_a in possible_teams):
+                match_found = m
+                break
+                
+        if match_found:
+            sorted_current.append(match_found)
+            used.add(id(match_found))
+        else:
+            for m in current_stage_matches:
+                if id(m) not in used:
+                    sorted_current.append(m)
+                    used.add(id(m))
                     break
                     
-        if not h_feeder:
-            for cm in current_matches:
-                if id(cm) not in used_ids:
-                    h_feeder = cm
-                    used_ids.add(id(cm))
-                    break
-        if not a_feeder:
-            for cm in current_matches:
-                if id(cm) not in used_ids:
-                    a_feeder = cm
-                    used_ids.add(id(cm))
-                    break
-        
-        if h_feeder: sorted_matches.append(h_feeder)
-        if a_feeder: sorted_matches.append(a_feeder)
-        
-    for cm in current_matches:
-        if id(cm) not in used_ids:
-            sorted_matches.append(cm)
-            used_ids.add(id(cm))
+    for m in current_stage_matches:
+        if id(m) not in used:
+            sorted_current.append(m)
+            used.add(id(m))
             
-    return sorted_matches
+    return sorted_current
 
 # ==========================================
 # 3. UI 模組：圖片國旗支援與 HTML 卡片重構
@@ -463,16 +486,15 @@ if "error" not in match_res:
                 m["utcDate"] = get_mock_date(stage_code, i)
 
 with sub_tab1:
-    st.subheader("🌳 淘汰賽晉級樹狀圖 (嚴格拓樸配對版)")
+    st.subheader("🌳 淘汰賽晉級樹狀圖 (HK01 標準籤表正向對位)")
     
-    # 完全一樣的逆向溯源排版
-    r5_m = get_padded_matches(all_m, "FINAL", 1)
-    r4_m = sort_matches_for_bracket(get_padded_matches(all_m, "SEMI_FINALS", 2), r5_m)
-    r3_m = sort_matches_for_bracket(get_padded_matches(all_m, "QUARTER_FINALS", 4), r4_m)
-    r2_m = sort_matches_for_bracket(get_padded_matches(all_m, "LAST_16", 8), r3_m)
-    r1_m = sort_matches_for_bracket(get_padded_matches(all_m, "LAST_32", 16), r2_m)
+    # 完全重組的 100% 精準配對
+    r1_m = sort_r1_by_layout(get_padded_matches(all_m, "LAST_32", 16))
+    r2_m = sort_subsequent_stage(r1_m, get_padded_matches(all_m, "LAST_16", 8))
+    r3_m = sort_subsequent_stage(r2_m, get_padded_matches(all_m, "QUARTER_FINALS", 4))
+    r4_m = sort_subsequent_stage(r3_m, get_padded_matches(all_m, "SEMI_FINALS", 2))
     
-    r5_f = r5_m[0]
+    r5_f = get_padded_matches(all_m, "FINAL", 1)[0]
     r5_t = get_padded_matches(all_m, "THIRD_PLACE", 1)[0]
 
     r1_html = build_col(r1_m, 90)
