@@ -380,7 +380,7 @@ def get_svg_connector(count, h):
 
 def get_display_scores(score_obj):
     """
-    【全新】強制平局校驗法 (True-Tie Check)：
+    【強制平局校驗法 (True-Tie Check)】：
     只有在能證明基底分數為「平局」的情況下，才承認並顯示 PK 分數。
     若基底分數不平局，則將 API 給的異常 PK 數據視為髒資料直接捨棄。
     """
@@ -456,12 +456,9 @@ def get_match_card_html(match):
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
-    
-    # 擷取並整合場地資訊
-    venue_raw = match.get("venue")
-    venue_display = f" · {venue_raw}" if venue_raw else " · 地點待定"
 
-    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:6px 10px;width:170px;height:82px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:10px;line-height:1.2;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{dt_display}{venue_display}</div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{h_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{a_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{a_score}</span></div></div>'
+    # HTML 內已移除地點資訊
+    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:6px 10px;width:170px;height:82px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:10px;line-height:1.2;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{dt_display}</div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{h_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{a_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{a_score}</span></div></div>'
     return html
 
 def build_col(matches, cell_height):
@@ -494,10 +491,7 @@ def display_match_item(match, display_date=True):
     
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if (tpe_dt and display_date) else (tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定")
     
-    # 擷取並整合場地資訊 (列表版使用 📍 圖示)
-    venue_raw = match.get("venue")
-    venue_display = venue_raw if venue_raw else "地點待定"
-    
+    # 已將列表卡片中的地點顯示區塊移除
     card_html = f"""
     <div style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; padding:12px 10px; border-radius:8px; margin-bottom:12px; border:1px solid #eaebed; box-shadow:0 1px 2px rgba(0,0,0,0.05); font-family:sans-serif;">
         <div style="flex:1; text-align:center; min-width:0;">
@@ -509,7 +503,6 @@ def display_match_item(match, display_date=True):
         <div style="width:110px; text-align:center; border-left:1px solid #f1f3f4; border-right:1px solid #f1f3f4; padding:0 5px; flex-shrink:0; display:flex; flex-direction:column; justify-content:center; align-items:center;">
             <div style="font-size:12px; color:#70757a; margin-bottom:4px; white-space:nowrap;">{dt_display}</div>
             <div style="font-size:13px; font-weight:bold; color:#1a73e8; background:#e8f0fe; padding:3px 6px; border-radius:4px; display:inline-block; white-space:nowrap; margin-bottom:4px;">{status_text}</div>
-            <div style="font-size:11px; color:#80868b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">📍 {venue_display}</div>
         </div>
         <div style="flex:1; text-align:center; min-width:0;">
             <div style="font-size:14px; font-weight:bold; color:#202124; margin-bottom:4px; display:flex; justify-content:center; align-items:center; flex-wrap:wrap;">
@@ -559,7 +552,7 @@ else:
     
     with tab1:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (雙軌結構鎖定版)")
-        st.caption("💡 提示：已啟動強制平局過濾機制！系統將自動排查並捨棄 API 的異常 PK 分數，只顯示最正確的賽況。各場地資訊也已同步載入。")
+        st.caption("💡 提示：已啟動強制平局過濾機制！系統將自動排查並捨棄 API 的異常 PK 分數，只顯示最正確的賽況。")
         
         r1_m = sort_r1_by_layout(get_padded_matches(all_matches, "LAST_32", 16))
         r2_m = sort_subsequent_stage(r1_m, get_padded_matches(all_matches, "LAST_16", 8))
