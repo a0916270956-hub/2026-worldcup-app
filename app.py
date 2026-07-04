@@ -121,6 +121,7 @@ GROUP_MAP = {
 def fetch_all_matches():
     url = "https://api.football-data.org/v4/competitions/WC/matches"
     headers = {"X-Auth-Token": API_TOKEN}
+    # 2030年使用時，需將下方的 "2026" 修改為 "2030"
     params = {"season": "2026"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=10)
@@ -134,6 +135,7 @@ def fetch_all_matches():
 def fetch_standings():
     url = "https://api.football-data.org/v4/competitions/WC/standings"
     headers = {"X-Auth-Token": API_TOKEN}
+    # 2030年使用時，需將下方的 "2026" 修改為 "2030"
     params = {"season": "2026"}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=10)
@@ -167,6 +169,7 @@ def get_group_team(standings_data, group_letter, pos, fallback):
     return fallback
 
 def get_mock_date(stage, index):
+    # 2030年使用時，請依據當屆賽程表更新這裡的預設時間
     base_dates = {
         "LAST_32": datetime(2026, 6, 28, 12, 0, 0),
         "LAST_16": datetime(2026, 7, 4, 12, 0, 0),
@@ -274,6 +277,7 @@ def get_padded_matches(matches, stage, expected_count):
     return stage_matches[:expected_count]
 
 def sort_r1_by_layout(matches):
+    # 2030年使用時，需依照當屆樹狀圖配置更新此字典
     bracket_layout = [
         {"Germany", "德國", "Paraguay", "巴拉圭"},
         {"France", "法國", "Sweden", "瑞典"},
@@ -299,7 +303,7 @@ def sort_r1_by_layout(matches):
         for idx, expected in enumerate(bracket_layout):
             if h in expected or a in expected:
                 return idx
-        return 999
+        return idx
     
     return sorted(matches, key=get_idx)
 
@@ -351,7 +355,7 @@ def sort_subsequent_stage(prev_stage_matches, current_stage_matches):
     return final_matches
 
 # ==========================================
-# 3. UI 模組：核心高精準雙層比分解析器
+# 3. UI 模組：結構性高精準比分與場地渲染器
 # ==========================================
 def get_flag_url(team_en):
     code = TEAM_FLAG_CODE.get(team_en.strip())
@@ -376,35 +380,60 @@ def get_svg_connector(count, h):
 
 def get_display_scores(score_obj):
     """
-    數學邏輯推演校正器：全自動分離並還原被 API 混入總分的 PK 分數。
+    【全新】強制平局校驗法 (True-Tie Check)：
+    只有在能證明基底分數為「平局」的情況下，才承認並顯示 PK 分數。
+    若基底分數不平局，則將 API 給的異常 PK 數據視為髒資料直接捨棄。
     """
     if not score_obj:
         return "-", "-"
         
-    ft_h = score_obj.get("fullTime", {}).get("home")
-    ft_a = score_obj.get("fullTime", {}).get("away")
-    p_h = score_obj.get("penalties", {}).get("home")
-    p_a = score_obj.get("penalties", {}).get("away")
+    ft = score_obj.get("fullTime") or {}
+    rt = score_obj.get("regularTime") or {}
+    et = score_obj.get("extraTime") or {}
+    p = score_obj.get("penalties") or {}
+    
+    ft_h = ft.get("home")
+    ft_a = ft.get("away")
     
     if ft_h is None or ft_a is None:
         return "-", "-"
         
     h_base, a_base = int(ft_h), int(ft_a)
     
-    # 只要存在 PK 點球大戰的數據
+    p_h = p.get("home")
+    p_a = p.get("away")
+    
     if p_h is not None and p_a is not None:
         p_h_int, p_a_int = int(p_h), int(p_a)
         
-        # 檢測 API 的 fullTime 是否已將 PK 算入總分
-        # 邏輯核心：進入 PK 戰的前提是常規賽雙方必定平手。
-        # 因此，若 (主隊總分 - 主隊PK) == (客隊總分 - 客隊PK)，代表 fullTime 已被汙染，必須強制扣除。
-        if h_base >= p_h_int and a_base >= p_a_int:
-            if (h_base - p_h_int) == (a_base - p_a_int):
-                h_base -= p_h_int
-                a_base -= p_a_int
-                
-        return f"{h_base} ({p_h_int})", f"{a_base} ({p_a_int})"
+        rt_h, rt_a = rt.get("home"), rt.get("away")
+        et_h, et_a = et.get("home"), et.get("away")
         
+        is_valid_pk = False
+        
+        # 1. 優先採納延長賽，且必須為平局
+        if et_h is not None and et_a is not None and int(et_h) == int(et_a):
+            h_base, a_base = int(et_h), int(et_a)
+            is_valid_pk = True
+        # 2. 其次採納常規賽，且必須為平局
+        elif rt_h is not None and rt_a is not None and int(rt_h) == int(rt_a):
+            h_base, a_base = int(rt_h), int(rt_a)
+            is_valid_pk = True
+        # 3. 數學還原法：如果 API 把 PK 算進 fullTime，扣除後必須是平局
+        elif h_base >= p_h_int and a_base >= p_a_int and (h_base - p_h_int) == (a_base - p_a_int):
+            h_base -= p_h_int
+            a_base -= p_a_int
+            is_valid_pk = True
+        # 4. 如果 fullTime 本來就是乾淨的平局
+        elif h_base == a_base:
+            is_valid_pk = True
+            
+        if is_valid_pk:
+            return f"{h_base} ({p_h_int})", f"{a_base} ({p_a_int})"
+        else:
+            # 防呆過濾機制：算不出平局代表不是 PK 戰，直接略過顯示 ()
+            return str(int(ft_h)), str(int(ft_a))
+            
     return str(h_base), str(a_base)
 
 def get_match_card_html(match):
@@ -427,8 +456,12 @@ def get_match_card_html(match):
 
     tpe_dt = get_taipei_time(match.get("utcDate", ""))
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if tpe_dt else "時間待定"
+    
+    # 擷取並整合場地資訊
+    venue_raw = match.get("venue")
+    venue_display = f" · {venue_raw}" if venue_raw else " · 地點待定"
 
-    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:6px 10px;width:170px;height:82px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:11px;line-height:1.2;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{dt_display}</div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{h_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{a_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{a_score}</span></div></div>'
+    html = f'<div style="background-color:#ffffff;border:1px solid #dadce0;border-radius:8px;padding:6px 10px;width:170px;height:82px;box-sizing:border-box;font-family:sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.05);z-index:10;display:flex;flex-direction:column;justify-content:space-between;"><div style="font-size:10px;line-height:1.2;color:#70757a;border-bottom:1px solid #f1f3f4;padding-bottom:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{dt_display}{venue_display}</div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{h_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{h_score}</span></div><div style="display:flex;justify-content:space-between;align-items:center;flex:1;"><span style="font-size:13px;line-height:1.2;font-weight:500;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">{a_display}</span><span style="font-size:13px;line-height:1.2;font-weight:bold;color:#202124;margin-left:4px;">{a_score}</span></div></div>'
     return html
 
 def build_col(matches, cell_height):
@@ -461,6 +494,10 @@ def display_match_item(match, display_date=True):
     
     dt_display = tpe_dt.strftime("%m/%d %H:%M") if (tpe_dt and display_date) else (tpe_dt.strftime("%H:%M") if tpe_dt else "時間待定")
     
+    # 擷取並整合場地資訊 (列表版使用 📍 圖示)
+    venue_raw = match.get("venue")
+    venue_display = venue_raw if venue_raw else "地點待定"
+    
     card_html = f"""
     <div style="display:flex; justify-content:space-between; align-items:center; background:#ffffff; padding:12px 10px; border-radius:8px; margin-bottom:12px; border:1px solid #eaebed; box-shadow:0 1px 2px rgba(0,0,0,0.05); font-family:sans-serif;">
         <div style="flex:1; text-align:center; min-width:0;">
@@ -469,9 +506,10 @@ def display_match_item(match, display_date=True):
             </div>
             <div style="font-size:26px; font-weight:bold; color:#202124;">{h_score}</div>
         </div>
-        <div style="width:85px; text-align:center; border-left:1px solid #f1f3f4; border-right:1px solid #f1f3f4; padding:0 5px; flex-shrink:0;">
-            <div style="font-size:12px; color:#70757a; margin-bottom:6px; white-space:nowrap;">{dt_display}</div>
-            <div style="font-size:13px; font-weight:bold; color:#1a73e8; background:#e8f0fe; padding:3px 6px; border-radius:4px; display:inline-block; white-space:nowrap;">{status_text}</div>
+        <div style="width:110px; text-align:center; border-left:1px solid #f1f3f4; border-right:1px solid #f1f3f4; padding:0 5px; flex-shrink:0; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div style="font-size:12px; color:#70757a; margin-bottom:4px; white-space:nowrap;">{dt_display}</div>
+            <div style="font-size:13px; font-weight:bold; color:#1a73e8; background:#e8f0fe; padding:3px 6px; border-radius:4px; display:inline-block; white-space:nowrap; margin-bottom:4px;">{status_text}</div>
+            <div style="font-size:11px; color:#80868b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">📍 {venue_display}</div>
         </div>
         <div style="flex:1; text-align:center; min-width:0;">
             <div style="font-size:14px; font-weight:bold; color:#202124; margin-bottom:4px; display:flex; justify-content:center; align-items:center; flex-wrap:wrap;">
@@ -521,7 +559,7 @@ else:
     
     with tab1:
         st.subheader("🌳 淘汰賽晉級樹狀圖 (雙軌結構鎖定版)")
-        st.caption("💡 提示：已全面啟用結構性雙軌對位與高階比分還原演算法！PK 戰分數將完全獨立顯示，絕不與常規賽混淆。")
+        st.caption("💡 提示：已啟動強制平局過濾機制！系統將自動排查並捨棄 API 的異常 PK 分數，只顯示最正確的賽況。各場地資訊也已同步載入。")
         
         r1_m = sort_r1_by_layout(get_padded_matches(all_matches, "LAST_32", 16))
         r2_m = sort_subsequent_stage(r1_m, get_padded_matches(all_matches, "LAST_16", 8))
