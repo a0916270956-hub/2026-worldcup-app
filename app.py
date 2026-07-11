@@ -517,6 +517,17 @@ def display_match_item(match, display_date=True):
 # ==========================================
 st.set_page_config(page_title="2026世足動態全功能看板", page_icon="🏆", layout="wide")
 
+# 【方法一：隱藏右上角選單】 - 將 CSS 注入放在 set_page_config 正下方
+hide_menu_style = """
+    <style>
+    /* 隱藏右上角包含 GitHub 與 Fork 的工具列 */
+    [data-testid="stToolbar"] {visibility: hidden !important;}
+    /* 隱藏右下角的 Made with Streamlit 浮水印 (可選) */
+    footer {visibility: hidden !important;}
+    </style>
+"""
+st.markdown(hide_menu_style, unsafe_allow_html=True)
+
 st.title("🏆 2026 世足賽動態看板")
 
 if st.button("🔄 立即刷新、同步最新數據", use_container_width=True):
